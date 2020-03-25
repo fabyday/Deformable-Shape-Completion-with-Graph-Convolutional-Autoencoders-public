@@ -1,0 +1,6 @@
+/.vscode
+/checkpoints
+/conv_ply
+/processed_dataset
+/summaries
+/__pycache__
