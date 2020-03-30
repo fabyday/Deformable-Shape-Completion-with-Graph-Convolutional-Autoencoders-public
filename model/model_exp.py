@@ -4,7 +4,7 @@ from .logger import * #set_device, time_set
 from .utils import * 
 
 """
- no prob latent.
+experimental model
 """
 
 device = "GPU:1"
@@ -99,26 +99,18 @@ class Encoder(tf.keras.Model):
         # # self.exec_list.append(tf.keras.layers.BatchNormalization())
         # self.exec_list.append(self.activation_layer())
 
-        # for idx in range(1, len(self.layer_info)-1):
-        for idx in range(len(self.layer_info)-1):
-            if idx == len(self.layer_info)-2 :
-                activation = None 
-            else : 
-                activation = self.activation
-
-            self.exec_list.append( NLayer(input_shape=self.layer_info[idx],
+        idx = 0 
+        self.exec_list.append( NLayer(input_shape=self.layer_info[idx],
                                         output_shape=self.layer_info[idx+1],
                                         adj=self.adj,
                                         kernel_size=self.kernel_size,
                                         # activation=self.activation,
-                                        activation= activation, 
+                                        activation= None,
                                         name=self.name[0]+"_Layer_"+str(idx),
                                         trainable=self.trainable
                                         )
                                 )
-            if not activation : # if activation None. Add ACTIVATION AND NORMALIZATION.
-                # self.exec_list.append(tf.keras.layers.BatchNormalization())
-                self.exec_list.append(self.activation_layer())
+        # self.exec_list.append(self.activation_layer())
 
         
         
@@ -136,7 +128,7 @@ class Encoder(tf.keras.Model):
 
 
                                                         
-        # print("build complete Eecoder")
+        
            
 
     @tf.function
@@ -193,26 +185,19 @@ class Decoder(tf.keras.Model):
 
 
         # for idx in range(len(self.layer_info)-2):
-        for idx in range(len(self.layer_info)-1):
-            # if idx == len(self.layer_info)-3 : 
-            if idx == len(self.layer_info)-3 : 
-                activation = None 
-            else : 
-                activation = self.activation
-
-            self.exec_list.append(NLayer(input_shape=self.layer_info[idx],
+        idx = 0
+        self.exec_list.append(NLayer(input_shape=self.layer_info[idx],
                                         output_shape=self.layer_info[idx+1],
                                         adj=self.adj,
                                         kernel_size=self.kernel_size,
                                         # activation=self.activation,
-                                        activation=activation,
+                                        activation=None,
                                         name=self.name[0]+"Layer"+str(idx),
                                         trainable=self.trainable
                                         )
                                 )
-            if not activation : # if activation None. Add ACTIVATION AND NORMALIZATION.
-                # self.exec_list.append(tf.keras.layers.BatchNormalization())
-                self.exec_list.append(self.activation_layer())
+           
+        # self.exec_list.append(self.activation_layer())
             
         # self.exec_list.append(LinearLayer(
         #                         output_shape = self.layer_info[-1],
@@ -227,10 +212,8 @@ class Decoder(tf.keras.Model):
     @set_device(device)
     def call(self, inputs):
         x = inputs
-        # first_event = True
         first_event = False
 
-        # tf.print("="*10)
 
         for layer in self.exec_list:
             x = layer(x)
@@ -238,14 +221,6 @@ class Decoder(tf.keras.Model):
                 first_event = False
                 x = tf.reshape(x,[self.batch_size, self.vertex_size, -1])
             
-            # tf.print("name layer : ", layer.name)
-            # for i in layer.get_weights():
-                # tf.print("weights : ", i)
-
-
-        # tf.print("x : ", x)
-        # tf.print("**"*10)
-
         return x 
 
 
@@ -308,7 +283,13 @@ class NLayer(tf.keras.layers.Layer):
                                      shape=[coord_size, self.kernel_size,self.output_chanel],
                                      initializer = tf.keras.initializers.GlorotNormal
                                      )
-                                     
+        #for testing
+        self.W_x = self.add_weight (name = "W_x",
+                                     shape=[coord_size, self.kernel_size,self.output_chanel],
+                                     initializer = tf.keras.initializers.GlorotNormal
+                                     )
+
+
         self.b = self.add_weight (name = "b",
                                      shape=[self.output_chanel],
                                      initializer = tf.keras.initializers.zeros
@@ -367,7 +348,8 @@ class NLayer(tf.keras.layers.Layer):
         # ux := [batch_size,vertice_size, 1, kernel_size]
         ux = tf.expand_dims(ux, 2)
         # patches = u(X_point + X_neighbor) + c 
-        patches = tf.add(ux, patches)
+        # patches = tf.add(ux, patches)
+        patches = tf.add(ux, -patches)
         
         patches = tf.add(patches, self.c)
         
@@ -411,6 +393,15 @@ class NLayer(tf.keras.layers.Layer):
         patches = tf.reduce_sum(patches, axis = 2)
         patches = patches + self.b 
         
+        #for testing
+        w_x = tf.reshape(self.W_x, [coord_size, self.kernel_size*self.output_chanel])
+        point_x = tf.map_fn(lambda x : tf.matmul(x, w_x), x)
+        # point_x = wx
+        # batch_size, vertice_size, self.kerenl_size, self.output_shape
+        x_point_patches = tf.reshape(point_x, [batch_size, vertice_size, self.kernel_size, self.output_chanel]) 
+        x_point_patches = tf.reduce_sum(x_point_patches, axis=2)
+        patches += x_point_patches
+
         result = self.activation_func(patches) if self.activation_func != None else patches       
         
         return result 

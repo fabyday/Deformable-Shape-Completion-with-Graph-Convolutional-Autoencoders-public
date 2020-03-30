@@ -34,7 +34,7 @@ else :
 
 #common sets
 name="test_model_2020_3d-reiqwen"
-name="test_model_2020_3d-test321"
+name="submarine3"
 
 
 #loader sets
@@ -57,11 +57,14 @@ model_params['name'] = name
 model_params['random_seed'] = 2
 model_params['batch_size'] = 1
 model_params['kernel_size'] = 3
-model_params['use_latent'] = True 
-model_params['latent_size'] = 128
-model_params['num_epoch'] = 200
-model_params['F'] = [16, 32, 64, 128] #####        input_shape      [ hidden_layer_output_shape1 ... ]
+model_params['use_latent'] = False 
+model_params['latent_size'] = 32#64#128
+model_params['num_epoch'] = 4
+model_params['F'] = [16, 32]#, 64]#, 128] #####        input_shape      [ hidden_layer_output_shape1 ... ]
+model_params['F'] = [16]#, 16,16]#, 64]#, 128] #####        input_shape      [ hidden_layer_output_shape1 ... ]
+
 model_params['F_0'] = loader.get_train_shape()[-1]
+
 model_params['adj'] = neighbor # 5023, 32
 model_params['activation'] = "leakyrelu"
 

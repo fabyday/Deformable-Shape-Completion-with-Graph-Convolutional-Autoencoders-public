@@ -2,8 +2,8 @@ import tensorflow as tf
 import numpy as np 
 from .logger import * #set_device, time_set
 import os 
-from .model1 import Model, loss
-# from .model2 import Model, loss
+# from .model1 import Model, loss
+from .model_exp import Model, loss
 import copy 
 from .utils import *
 
@@ -96,6 +96,7 @@ class ModelWrapper:
                             name = "Model",
                             trainable = True
                             )
+
         
 
     def _basic_postconfigure(self):
@@ -133,7 +134,7 @@ class ModelWrapper:
     #     total_loss = tf.keras.backend.mean(total_loss, axis = 0)
     #     return total_loss
     
-    
+    @tf.function
     def train_batch(self, inputs, labels):
         with tf.GradientTape() as tape:
             result = self.model(inputs)
@@ -183,8 +184,8 @@ class ModelWrapper:
                 if int(self.ckpt.step) % 100 == 0 :
                     save_path = self.manager.save()
             
-            with self.train_summary_writer.as_default():
-                tf.summary.scalar("loss", losses/(step+1), step=epoch)
+            # with self.train_summary_writer.as_default():
+            #     tf.summary.scalar("loss", losses/(step+1), step=epoch)
 
         return loss    
 
@@ -289,3 +290,5 @@ class ModelWrapper:
 
         print_summary_detail(encoder)
         print_summary_detail(decoder)
+
+        draw_weight(self.model)
