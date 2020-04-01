@@ -112,7 +112,27 @@ class Loader(object):
         self.__announce()
     
     def get_data_normalize(self, data):
-        return (data - self.label_facedata.mean) / self.label_facedata.std
+        # return (data - self.label_facedata.mean) / self.label_facedata.std
+        ref_v = self.label_facedata.ref_mesh.v
+        ref_v = ref_v.astype(np.float32)
+        max_val = self.label_facedata.max_data
+        min_val = self.label_facedata.min_data
+        print("type :", data.dtype)
+        
+        print("max val min val", max_val, min_val)
+
+        # if max_val == min_val, max and mean is inputs, +epssilon
+        alpha = 0.9
+        epsilon = 10e-8
+        idx = max_val==min_val
+        print(idx)
+        max_val[idx] += epsilon
+        min_val[idx] -= epsilon
+        inputs = 2 * alpha * (data-min_val)/(max_val-min_val) - alpha
+        print("inputs max min", np.min(inputs), np.max(inputs))
+        print("type :", inputs.dtype)
+        return inputs
+        
     
     def get_data_denormalize(self, data):
         return data * self.label_facedata.std + self.label_facedata.mean

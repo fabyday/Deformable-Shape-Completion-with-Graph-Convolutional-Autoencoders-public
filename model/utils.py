@@ -19,6 +19,10 @@ def _(self : tf.keras.layers.Layer, opt : str):
         elif opt == "leakyrelu": 
             # return tf.keras.activations.leakyrelu
             return tf.nn.leaky_relu
+        elif opt == "tanh":
+            print("tanh")
+            return tf.nn.tanh
+    
         elif opt == None:
             return None
 
@@ -33,7 +37,9 @@ def _(self : tf.keras.Model, opt : str):
             return tf.keras.layers.ReLU
         elif opt == "leakyrelu": 
             return tf.keras.layers.LeakyReLU
-
+        elif opt == "tanh":
+            return tf.keras.layers.Activation("tanh")
+    
     else : 
         return opt
 

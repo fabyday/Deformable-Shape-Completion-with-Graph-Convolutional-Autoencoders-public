@@ -4,7 +4,8 @@ from .logger import * #set_device, time_set
 from .utils import * 
 
 """
- no prob latent.
+determine model
+
 """
 
 device = "GPU:1"
@@ -89,17 +90,6 @@ class Encoder(tf.keras.Model):
     @set_device(device)
     def build(self, input_shape):
 
-        # self.exec_list.append(LinearLayer(  
-        #                                 output_shape = self.layer_info[1],
-        #                                 activation=None,
-        #                                 # activation=self.activation,
-        #                                 name = "C_LAYER",
-        #                                 trainable=True
-        #                                 ))
-        # # self.exec_list.append(tf.keras.layers.BatchNormalization())
-        # self.exec_list.append(self.activation_layer())
-
-        # for idx in range(1, len(self.layer_info)-1):
         for idx in range(len(self.layer_info)-1):
             if idx == len(self.layer_info)-2 :
                 activation = None 
@@ -110,16 +100,11 @@ class Encoder(tf.keras.Model):
                                         output_shape=self.layer_info[idx+1],
                                         adj=self.adj,
                                         kernel_size=self.kernel_size,
-                                        # activation=self.activation,
                                         activation= activation, 
                                         name=self.name[0]+"_Layer_"+str(idx),
                                         trainable=self.trainable
                                         )
                                 )
-            if not activation : # if activation None. Add ACTIVATION AND NORMALIZATION.
-                # self.exec_list.append(tf.keras.layers.BatchNormalization())
-                self.exec_list.append(self.activation_layer())
-
         
         
         if self.use_latent : 
@@ -210,10 +195,7 @@ class Decoder(tf.keras.Model):
                                         trainable=self.trainable
                                         )
                                 )
-            if not activation : # if activation None. Add ACTIVATION AND NORMALIZATION.
-                # self.exec_list.append(tf.keras.layers.BatchNormalization())
-                self.exec_list.append(self.activation_layer())
-            
+                                
         # self.exec_list.append(LinearLayer(
         #                         output_shape = self.layer_info[-1],
         #                         activation=None,

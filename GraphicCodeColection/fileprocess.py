@@ -60,9 +60,11 @@ class DataProcessor():
         ref_v, raw_face_data = serialize.load_from_mesh(self.reference_face_file)
         self.ref_mesh = mesh.Mesh(ref_v, raw_face_data)
         self.face = raw_face_data
-        self.vertices = raw_vertex_data
+        self.vertices = self._set_type(raw_vertex_data)
         self.std = np.std(self.vertices)
         self.mean = np.mean(self.vertices)
+        self._store_max_value(self.vertices)
+        self._store_min_value(self.vertices)
         #split data.
         self._split()
     
@@ -72,9 +74,16 @@ class DataProcessor():
         self.vertices_val = self.vertices_train[-self.valset_size:]
         self.vertices_train = self.vertices_train[:-self.valset_size]
 
+    def _set_type(self, inputs):
+        return inputs.astype(np.float32)
 
     def _store_normalize_data(self):
         return self.std, self.mean
+
+    def _store_min_value(self, data):
+        self.min_data = np.min(data, keepdims=True)
+    def _store_max_value(self, data):
+        self.max_data = np.max(data, keepdims=True)
 
 
     

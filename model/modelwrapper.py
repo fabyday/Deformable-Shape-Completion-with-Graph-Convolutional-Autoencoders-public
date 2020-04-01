@@ -2,8 +2,8 @@ import tensorflow as tf
 import numpy as np 
 from .logger import * #set_device, time_set
 import os 
-# from .model1 import Model, loss
 from .model_exp import Model, loss
+# from .model_exp import Model, loss
 import copy 
 from .utils import *
 
@@ -108,32 +108,7 @@ class ModelWrapper:
         pass
     # -------------------------------------------------------------------------------------
     # =============LOSS & train_batch CONFIGURE ===========================================
-    # @tf.function
-    # def loss(self, y_input, y_pred, args=None):
-    #     def log_normal_pdf(sample, mean, logvar, raxis=1): 
-    #         log2pi = tf.math.log(2. * np.pi)
-    #         return tf.reduce_sum(-.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi), axis=raxis)
-        
-    #     total_loss = self.loss_func(y_pred, y_input)
-    #     if type(args) == list and len(args) == 2:            
-    #         latent_z = args[0]
-    #         z_mean = args[1]
-    #         z_log_var = args[2]
 
-    #         kl_loss = 1 + z_log_var - tf.keras.backend.square(z_mean) - tf.keras.backend.exp(z_log_var) 
-    #         kl_loss = tf.keras.backend.sum(kl_loss, axis = - 1)
-    #         logpz = log_normal_pdf(latent_z, 0., 0.)
-    #         logpz_x = log_normal_pdf(latent_z, z_mean, z_log_var)
-    #         kl_loss = logpz - logpz_x
-    #         if tf.math.is_nan(kl_loss) : 
-    #             pass
-    #             # tf.print("kl_loss : {}\n, z_mean {}, \nz_log_var : {}".format(kl_loss, z_mean, z_log_var))
-                
-    #         total_loss += (10e-8 * kl_loss)
-
-    #     total_loss = tf.keras.backend.mean(total_loss, axis = 0)
-    #     return total_loss
-    
     @tf.function
     def train_batch(self, inputs, labels):
         with tf.GradientTape() as tape:
@@ -193,7 +168,6 @@ class ModelWrapper:
     def predict(self, inputs, labels, batch_size): 
         self.restore_checkpoint()
         
-        
         size=len(inputs)
         pred=[0]*size
         losses =0
@@ -234,7 +208,7 @@ class ModelWrapper:
         self.model.trainable = False 
         encoder = self.model.encoder
         decoder = self.model.decoder
-        latent_z = tf.Variable(trianable=True, shape=[self.batch_size, self.latent_size], name = "trainable=latent_z")
+        latent_z = tf.Variable(trianable=True, shape=[self.batch_size, self.latent_size], name = "trainable_latent_z")
 
 
         for step, begin in enumerate(range(0, size, batch_size)):
