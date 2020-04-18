@@ -28,6 +28,10 @@ class ModelWrapper:
                 F,
                 adj,
                 activation,
+                face,
+                ds_D,
+                ds_U,
+                A,
                 checkpoint_save_path,
                 tensorboard_path,
                 ):
@@ -41,10 +45,16 @@ class ModelWrapper:
         self.F = F
         self.F_0 = F_0
         self.adj = adj
+        self.ds_D = ds_D
+        self.ds_U = ds_U
+        self.ds_U.reverse()
+        self.A = A
         self.activation = activation
         self.checkpoint_save_path = checkpoint_save_path
         self.tensorboard_path = tensorboard_path 
         self.num_epochs = num_epoch
+        self.face=face
+        
 
         self.optimizer = None
         self.loss_func = None 
@@ -93,6 +103,10 @@ class ModelWrapper:
                             activation = self.activation,
                             use_latent = self.use_latent,
                             latent_size = self.latent_size,
+                            face = self.face,
+                            ds_D = self.ds_D,
+                            ds_U = self.ds_U,
+                            A = self.A,
                             name = "Model",
                             trainable = True
                             )

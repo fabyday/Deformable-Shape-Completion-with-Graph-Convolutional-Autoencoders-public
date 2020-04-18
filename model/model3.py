@@ -212,7 +212,6 @@ class Decoder(tf.keras.Model):
         # first_event = True
         first_event = False
 
-        # tf.print("="*10)
 
         for layer in self.exec_list:
             x = layer(x)
@@ -220,14 +219,6 @@ class Decoder(tf.keras.Model):
                 first_event = False
                 x = tf.reshape(x,[self.batch_size, self.vertex_size, -1])
             
-            # tf.print("name layer : ", layer.name)
-            # for i in layer.get_weights():
-                # tf.print("weights : ", i)
-
-
-        # tf.print("x : ", x)
-        # tf.print("**"*10)
-
         return x 
 
 

@@ -57,3 +57,4 @@ def print_summary_detail(model):
         print(small_lines)
 
     
+

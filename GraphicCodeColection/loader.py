@@ -113,8 +113,7 @@ class Loader(object):
     
     def get_data_normalize(self, data):
         # return (data - self.label_facedata.mean) / self.label_facedata.std
-        ref_v = self.label_facedata.ref_mesh.v
-        ref_v = ref_v.astype(np.float32)
+
         max_val = self.label_facedata.max_data
         min_val = self.label_facedata.min_data
         print("type :", data.dtype)
@@ -133,7 +132,9 @@ class Loader(object):
         print("type :", inputs.dtype)
         return inputs
         
-    
+    def get_data_normalize2(self, data):
+        return (data - self.label_facedata.mean) / self.label_facedata.std
+
     def get_data_denormalize(self, data):
         return data * self.label_facedata.std + self.label_facedata.mean
         
