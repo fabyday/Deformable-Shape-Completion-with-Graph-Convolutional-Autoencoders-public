@@ -1,3 +1,21 @@
+# ModelWrapper Module  wraps small models. 
+# ModelWrapper give us many advantages.
+# 1. change model quickly. (module must be implement loss function and Model class).
+# 2. make new model based on trained model. ( like a phase1 model -> phase 2 model)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import tensorflow as tf
 import numpy as np 
 from .logger import * #set_device, time_set
@@ -11,6 +29,7 @@ from .utils import *
 
 
 
+#if you want to run eagerly. use tf.config.experimental_run_functions_eagerly(True)
 # tf.config.experimental_run_functions_eagerly(True)
 Model = Model
 model_loss = loss
@@ -136,6 +155,7 @@ class ModelWrapper:
             self.optimizer.apply_gradients(zip(gradient, self.model.trainable_variables))
         return loss
 
+
     # -------------------------------------------------------------------------------------
     # ==================TRAIN & PREDICTION=================================================
     
@@ -146,7 +166,7 @@ class ModelWrapper:
         size = inputs.shape[0]
         self.restore_checkpoint()
 
-        #save model graph
+        #save model graph (TODO but it's not work now. can't trace graph.)
         tf.summary.trace_on(graph=True)
         self.train_batch(inputs= inputs[:self.batch_size], labels=labels[:self.batch_size])
 
@@ -180,6 +200,9 @@ class ModelWrapper:
 
 
     def predict(self, inputs, labels, batch_size): 
+        """
+            phase 1 Prediction.
+        """
         self.restore_checkpoint()
         
         size=len(inputs)
@@ -212,6 +235,9 @@ class ModelWrapper:
 
 
     def predict2(self,inputs, labels, batch_size=1, iterations = 100):
+        """
+        phase 2 prediction. it just use decoder. 
+        """
         self.restore_checkpoint()
         
         size=len(inputs)
@@ -265,6 +291,8 @@ class ModelWrapper:
         summary_writer = tf.summary.create_file_writer(self.tensorboard_path)
         print("tensorboard : , ", self.tensorboard_path)
         return summary_writer
+    
+    
     # -------------------------------------------------------------------------------------
     # ======================================Etc.===========================================
     def summary(self):

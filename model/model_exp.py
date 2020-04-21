@@ -1,23 +1,39 @@
+"""
+    Network Model Implementation
+
+        function loss : it is calculate loss using vae.
+        class Model : model class is wrapper class for Encoder, Decoder. it contains Encoder, Decoder.
+            class Encoder : it contains NLayer, LinearLayer.
+            class Decoder : it contains NLayer, LinearLayer.
+                class NLayer : FeastNet Imeplementaion class.
+                class LinearLayer : it's custom Dense class.
+
+
+"""
+
 import tensorflow as tf
 import numpy as np 
-from .logger import * #set_device, time_set
-from .utils import * 
+from .logger import set_device, timeset #set_device, timeset
+from .utils import set_activation # it's legacy.
 
-#for pooling
+#for pooling.
 import math 
 import heapq
 import scipy.sparse as sp
 
 
+
 """
-experimental model
+experimental model.
 """
 
-device = "GPU:1"
+device = "GPU:1" # set GPU.
 
-# @tf.function
+# not VAE just L2 Loss Function.
+# @tf.function 
 # def loss(y_label, y_pred, args=None):
 #     return tf.keras.backend.mean(tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(y_label-y_pred, 2.0), axis=-1)), axis=-1))
+
 @tf.function
 def loss(y_label, y_pred, args=None):
         def log_normal_pdf(sample, mean, logvar, raxis=1): 
@@ -171,16 +187,29 @@ class Encoder(tf.keras.Model):
         # self.exec_list.append(self.activation_name_layer())
 
         idx = 0 
-        self.exec_list.append( NLayer(input_shape=self.layer_info[idx],
-                                        output_shape=self.layer_info[idx+1],
-                                        adj=self.adj[0],
-                                        kernel_size=self.kernel_size,
-                                        activation=self.activation_name,
-                                        # activation= None,
-                                        name=self.name[0]+"_Layer_"+str(idx),
-                                        trainable=self.trainable
-                                        )
-                                )
+        self.exec_list.append(LinearLayer(
+                                    output_shape=self.layer_info[idx+1],
+                                    kernel_initializer=tf.keras.initializers.GlorotNormal,
+                                    # use_bias=False,
+                                    use_bias = True,
+                                    bias_initializer=tf.keras.initializers.zeros,
+                                    # activation=self.activation_name,
+
+                                    activation=None,
+                                    use_batchnorm=True,
+                                    name="e_Dense_1",
+                                    trainable=True
+                                    ))
+        # self.exec_list.append( NLayer(input_shape=self.layer_info[idx],
+        #                                 output_shape=self.layer_info[idx+1],
+        #                                 adj=self.adj[0],
+        #                                 kernel_size=self.kernel_size,
+        #                                 activation=self.activation_name,
+        #                                 # activation= None,
+        #                                 name=self.name[0]+"_Layer_"+str(idx),
+        #                                 trainable=self.trainable
+        #                                 )
+        #                         )
 
         # self.exec_list.append(testlayer('inputlin', self.layer_info[idx+1], self.activation) )
         print("Test")
@@ -191,6 +220,7 @@ class Encoder(tf.keras.Model):
                                         kernel_size=self.kernel_size,
                                         activation=self.activation_name,
                                         # activation= None,
+                                        use_batchnorm=True,
                                         name=self.name[0]+"_Layer_"+str(idx+1),
                                         trainable=self.trainable
                                         )
@@ -201,6 +231,7 @@ class Encoder(tf.keras.Model):
                                         kernel_size=self.kernel_size,
                                         activation=self.activation_name,
                                         # activation= None,
+                                        use_batchnorm=True,
                                         name=self.name[0]+"_Layer_"+str(idx+2),
                                         trainable=self.trainable
                                         )
@@ -211,6 +242,7 @@ class Encoder(tf.keras.Model):
                                         kernel_size=self.kernel_size,
                                         # activation=self.activation_name,
                                         activation= None,
+                                        use_batchnorm=False,
                                         name=self.name[0]+"_Layer_"+str(idx+3),
                                         trainable=self.trainable
                                         )
@@ -235,7 +267,7 @@ class Encoder(tf.keras.Model):
                                     bias_initializer=tf.keras.initializers.zeros,
                                     # activation=self.activation_name,
                                     activation=None,
-                                    name="e_Dense_",
+                                    name="e_Dense_1",
                                     trainable=True
                                     ))
             # self.latent_list.append(tf.keras.layers.Dense(self.latent_size))
@@ -247,7 +279,7 @@ class Encoder(tf.keras.Model):
                                     bias_initializer=tf.keras.initializers.zeros,
                                     # activation=self.activation_name,
                                     activation=None,
-                                    name="e_Dense_",
+                                    name="e_Dense_2",
                                     trainable=True
                                     ))
 
@@ -275,18 +307,22 @@ class Encoder(tf.keras.Model):
     def latent_op(self, x):
         def sampling(args):
             z_mean, z_log_var = args
-            batch_size = tf.shape(z_mean)[0]
-            latent_dims = tf.shape(z_mean)[1]
-            epsilon = tf.keras.backend.random_normal(shape=(batch_size, latent_dims))
+            # batch_size = tf.shape(z_mean)[0]
+            
+            # latent_dims = tf.shape(z_mean)[1]
+            # epsilon = tf.keras.backend.random_normal(shape=(batch_size, latent_dims))
+            epsilon = tf.keras.backend.random_normal(shape=tf.shape(z_mean))
+
             return z_mean + tf.keras.backend.exp(0.5 * z_log_var) * epsilon
 
             
         vals =[]
-        shape = tf.shape(x)
-        x = tf.reshape(x, [shape[0], shape[1]*shape[-1]])
+        # shape = tf.shape(x)
+        # x = tf.reshape(x, [shape[0], shape[1]*shape[-1]])
         for op in self.latent_list:
             vals.append(op(x))
         z_mean, z_log_var = vals[0], vals[1]
+        print("z_mean", z_mean.shape)
         return sampling(vals), z_mean, z_log_var
         
     @tf.function
@@ -297,11 +333,12 @@ class Encoder(tf.keras.Model):
         # tf.print("=======================")
         for i, layer in enumerate(self.exec_list):
             x = layer(x)
+        print("enc", x.shape)
 
         if self.use_latent : 
 
             x, z_mean, z_log_var = self.latent_op(x)
-
+            print("enc x shape", x.shape)
             return x, z_mean, z_log_var
         return x 
     
@@ -350,26 +387,28 @@ class Decoder(tf.keras.Model):
         self.batch_size = batch_size
         self.use_latent = use_latent
         self.exec_list = []
+        self.latent_list =[]
         self.ds_U = ds_U
 
     @set_device(device)
     def build(self, input_shape):
         if self.use_latent: 
             print("self vertice size of all", self.vertex_size)
-            self.exec_list.append(LinearLayer(
-                                    # output_shape=self.layer_info[0]*self.vertex_size, 
-                                    output_shape=128, 
+            self.latent_list.append(LinearLayer(
+                                    output_shape=self.layer_info[0]*self.vertex_size, 
+                                    # output_shape=128, 
                                     kernel_initializer=tf.keras.initializers.GlorotNormal,
                                     # use_bias=False,
                                     use_bias = True,
                                     bias_initializer=tf.keras.initializers.zeros,
-                                    activation=None,
-                                    # activation=self.activation,
+                                    # activation=None,
+                                    activation=self.activation_name,
+                                    use_batchnorm=True,
                                     name="Dense_",
                                     trainable=True
                                     ))
 
-            self.exec_list.append(MeanPool(name="unpool"))
+        # self.exec_list.append(MeanPool(name="unpool"))
             # self.exec_list.append(tf.keras.layers.Dense(self.layer_info[0]*self.vertex_size))
         
         #     # self.exec_list.append(tf.keras.layers.BatchNormalization())
@@ -384,6 +423,7 @@ class Decoder(tf.keras.Model):
                                         kernel_size=self.kernel_size,
                                         activation=self.activation_name,
                                         # activation=None,
+                                        use_batchnorm=True,
                                         name=self.name[0]+"Layer"+str(idx),
                                         trainable=self.trainable
                                         )
@@ -395,6 +435,7 @@ class Decoder(tf.keras.Model):
                                         kernel_size=self.kernel_size,
                                         activation=self.activation_name,
                                         # activation=None,
+                                        use_batchnorm=True,
                                         name=self.name[0]+"Layer"+str(idx+1),
                                         trainable=self.trainable
                                         )
@@ -405,20 +446,34 @@ class Decoder(tf.keras.Model):
                                                 kernel_size=self.kernel_size,
                                                 activation=self.activation_name,
                                                 # activation=None,
+                                                use_batchnorm=True,
                                                 name=self.name[0]+"Layer"+str(idx+2),
                                                 trainable=self.trainable
                                                 )
                                         )
-        self.exec_list.append(NLayer(input_shape=self.layer_info[idx+3],
-                                                output_shape=self.layer_info[idx+4],
-                                                adj=self.adj[0],
-                                                kernel_size=self.kernel_size,
-                                                # activation=self.activation_name,
-                                                activation=None,
-                                                name=self.name[0]+"Layer"+str(idx+3),
-                                                trainable=self.trainable
-                                                )
-                                        )
+        # self.exec_list.append(NLayer(input_shape=self.layer_info[idx+3],
+        #                                         output_shape=self.layer_info[idx+4],
+        #                                         adj=self.adj[0],
+        #                                         kernel_size=self.kernel_size,
+        #                                         # activation=self.activation_name,
+        #                                         activation=None,
+        #                                         name=self.name[0]+"Layer"+str(idx+3),
+        #                                         trainable=self.trainable
+        #                                         )
+        #                                 )
+        self.exec_list.append(LinearLayer(
+                                    # output_shape=self.layer_info[0]*self.vertex_size, 
+                                    output_shape= self.layer_info[idx+4], 
+                                    kernel_initializer=tf.keras.initializers.GlorotNormal,
+                                    # use_bias=False,
+                                    use_bias = True,
+                                    bias_initializer=tf.keras.initializers.zeros,
+                                    activation=None,
+                                    use_batchnorm=False,
+                                    # activation=self.activation,
+                                    name="Dense_",
+                                    trainable=True
+                                    ))
                 
         print("build complete Decoder")
         
@@ -426,23 +481,14 @@ class Decoder(tf.keras.Model):
     @set_device(device)
     def call(self, inputs):
         x = inputs
-        first_event = self.use_latent
+        print("dec1", x.shape)
 
-        i = 0
+        if self.use_latent : 
+            x=self.latent_list[0](x)
+            x = tf.reshape(x, [tf.shape(x)[0], self.vertex_size, -1])
+
         for layer in self.exec_list:
             x = layer(x)
-            # if first_event : 
-            #     first_event = False
-            #     print("x.shape"*10, x.shape)
-            #     # x=feature_normalize(x)
-            #     x = layer(x)
-            #     x = tf.reshape(x, [tf.shape(x)[0], self.vertex_size, -1])
-            #     print("after x_shape"*10, x.shape)
-            # else :             
-            #     # x = self.pool(x, i)
-            #     i+=1
-            #     x = layer(x)
-
             
         return x 
     def pool(self, x, i):
@@ -499,6 +545,7 @@ class NLayer(tf.keras.layers.Layer):
                 adj = None,
                 kernel_size = 9,
                 activation=tf.keras.activations.relu,
+                use_batchnorm = False,
                 name = "Layer_",
                 trainable=True):
         super(NLayer, self).__init__(trainable=trainable,name=name)
@@ -510,20 +557,27 @@ class NLayer(tf.keras.layers.Layer):
         self.kernel_size = kernel_size
         self.activation_name= activation
         self.activation_func = set_activation(self, self.activation_name)
-    
+        
+        self.use_batchnorm = use_batchnorm
+        self.batch_norm = tf.keras.layers.BatchNormalization()
     @set_device(device)                              
     def build(self, input_shape):
         batch_size, vertex_size, coord_size = input_shape
+
+        # if self.use_batchnorm :
+        #     self.batch_norm = tf.keras.layers.BatchNormalization()
+
+
         self.adj = tf.constant(self.adj, dtype=tf.int32)
         self.W = self.add_weight (name = "W",
                                      shape=[coord_size, self.kernel_size,self.output_chanel],
                                      initializer = tf.keras.initializers.GlorotNormal
                                      )
         #for testing
-        self.W_x = self.add_weight (name = "W_x",
-                                     shape=[coord_size, self.kernel_size,self.output_chanel],
-                                     initializer = tf.keras.initializers.GlorotNormal
-                                     )
+        # self.W_x = self.add_weight (name = "W_x",
+        #                              shape=[coord_size, self.kernel_size,self.output_chanel],
+        #                              initializer = tf.keras.initializers.GlorotNormal
+        #                              )
 
 
         self.b = self.add_weight (name = "b",
@@ -649,22 +703,23 @@ class NLayer(tf.keras.layers.Layer):
         patches = tf.reduce_sum(patches, axis = 2)
         patches = patches + self.b 
         
-        #test
-        w_x = tf.reshape(self.W_x, [coord_size, self.kernel_size*self.output_chanel])
-        point_x = tf.map_fn(lambda x : tf.matmul(x, w_x), x)
-        # batch_size, vertice_size, self.kerenl_size, self.output_shape
-        x_point_patches = tf.reshape(point_x, [batch_size, vertice_size, self.kernel_size, self.output_chanel]) 
-        x_point_patches = tf.reduce_sum(x_point_patches, axis=2)
-        patches += x_point_patches
-        
+        # #test
+        # w_x = tf.reshape(self.W_x, [coord_size, self.kernel_size*self.output_chanel])
+        # point_x = tf.map_fn(lambda x : tf.matmul(x, w_x), x)
+        # # batch_size, vertice_size, self.kerenl_size, self.output_shape
+        # x_point_patches = tf.reshape(point_x, [batch_size, vertice_size, self.kernel_size, self.output_chanel]) 
+        # x_point_patches = tf.reduce_sum(x_point_patches, axis=2)
+        # patches += x_point_patches
+
+        result = patches
+
+        if self.use_batchnorm : 
+            result = self.batch_norm(result)
+                
         if self.activation_func != None :
-            # result = self.activation_func(self.feature_normalize(patches)) 
             result = self.activation_func(patches)
-            # print("activate"+self.name)
-        else :
-            result = patches       
-            # print("deactivate"+self.name)
-        
+            
+
         return result 
 
 class LinearLayer(tf.keras.layers.Layer):
@@ -674,6 +729,7 @@ class LinearLayer(tf.keras.layers.Layer):
                 use_bias = False, 
                 bias_initializer = tf.keras.initializers.zeros,
                 activation=None,
+                use_batchnorm=False,
                 name = "Linear_Layer_",
                 trainable=True):
         super(LinearLayer, self).__init__(trainable=trainable,name=name)
@@ -683,14 +739,22 @@ class LinearLayer(tf.keras.layers.Layer):
         self.kernel_initializer = kernel_initializer
         self.use_bias = use_bias
         self.activation_func = set_activation(self, self.activation_name)
+        
+        self.use_batchnorm = use_batchnorm
+        self.batch_norm = tf.keras.layers.BatchNormalization()
 
     @set_device(device)
     def build(self, inputs_shape): 
+
+        # if self.use_batchnorm : 
+        #     self.batch_norm = tf.keras.layers.BatchNormalization()
+
         print(inputs_shape)
-        assert len(inputs_shape) == 2, \
+        assert len(inputs_shape) == 3, \
             "input_shape length must be 3-dimension. it is {}".format(len(inputs_shape))
         self.Fin = inputs_shape[-1]
 
+        print(self.Fin, self.output_channel)
         self.W = self.add_weight (name = "W",
                                      shape=[self.Fin, self.output_channel],
                                      initializer = self.kernel_initializer
@@ -708,15 +772,20 @@ class LinearLayer(tf.keras.layers.Layer):
         #     inputs=tf.expand_dims(inputs, axis=1)
         # tf.print(inputs.shape)
         print(inputs.shape)
-        assert len(inputs.shape) == 2, \
-            "input_shape length must be 3-dimension. it is {}".format(len(inputs))
+        assert len(inputs.shape) == 3, "input_shape length must be 3-dimension. it is {}".format(len(inputs))
 
-        result = tf.matmul(inputs, self.W)
+        result = tf.map_fn(lambda x: tf.matmul(x, self.W), inputs)
         if self.use_bias : 
             result += self.b 
-        assert len(result.shape) == 2, \
-            "return value length must be 3-dimension. it is {}".format(len(inputs))
-        return result if self.activation_func == None else self.activation_func(result)
+        assert len(result.shape) == 3, "return value length must be 3-dimension. it is {}".format(len(inputs))
+        
+        if self.use_batchnorm : 
+            result = self.batch_norm(result)
+
+        if self.activation_func != None:
+             result = self.activation_func(result)
+
+        return result 
         
 
 class Pool(tf.keras.layers.Layer):
@@ -773,7 +842,9 @@ class Pool(tf.keras.layers.Layer):
 
 
     def call(self, inputs):
-        return self.pool_func(inputs)
+        result = self.pool_func(inputs)
+        print("pooling", result.shape)
+        return result
 
 class MeanPool(tf.keras.layers.Layer):
     
@@ -795,10 +866,11 @@ class MeanPool(tf.keras.layers.Layer):
   
     def call(self, inputs):
         # batch_size, 1, 128
-        inputs= tf.expand_dims(inputs, axis=1)
+        # inputs= tf.expand_dims(inputs, axis=1)
         # assert len(inputs.shape) != 3 , "length is not 3."
         result = tf.tile(inputs, [1,5023,1])
         # assert result.shape != [4, 5023, 128], "error"
+        print("mean pool", result.shape)
         return result
 
 

@@ -4,7 +4,11 @@ import heapq
 import numpy as np
 import os
 import scipy.sparse as sp
-from psbody.mesh import Mesh
+try : 
+    from psbody.mesh import Mesh
+    available_psbody = True
+except : 
+    available_psbody = False
 
 #from psbody.mesh.topology.decimation import vertex_quadrics
 
@@ -286,7 +290,6 @@ def generate_transform_matrices(v, f, factors):
 
 def generate_neighborhood(vertex, face):
     """
-    Create by RJH
     Generate Sample's 1-ring neighborhood
 
 

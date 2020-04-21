@@ -11,7 +11,7 @@ import json
 
 
 
-from GraphicCodeColection.mesh_sampling import generate_transform_matrices
+from GraphicCodeColection.mesh_sampling import generate_transform_matrices, generate_neighborhood, available_psbody
 
 from GraphicCodeColection.loader import Loader 
 
@@ -28,13 +28,13 @@ else :
 
 ############################################################################
 
-# SETTINGS
+# SETTINGS and ARGUMENTS.
 
 ############################################################################
 
 #common sets
 name="test_model_2020_3d-reiqwen"
-name="asdadsadge123132r5346345r3gvfd"
+name="test_tisldkjie"
 
 
 #loader sets
@@ -55,8 +55,8 @@ print(mode, "what is mode ")
 model_params = dict()
 model_params['name'] = name
 model_params['random_seed'] = 2
-model_params['batch_size'] = 4
-model_params['kernel_size'] = 3
+model_params['batch_size'] = 2
+model_params['kernel_size'] = 4
 model_params['use_latent'] = True 
 model_params['latent_size'] = 128#64#128
 model_params['num_epoch'] = 200
@@ -64,48 +64,40 @@ model_params['F'] = [16, 32, 64, 128] ### input_shape      [ hidden_layer_output
 
 model_params['F_0'] = loader.get_train_shape()[-1]
 
-# model_params['activation'] = "leakyrelu"
-model_params['activation'] = "tanh"
+model_params['activation'] = "leakyrelu"
+# model_params['activation'] = "tanh"
+# model_params['activation'] = "relu"
 model_params['face'] = ref.f
-_,A,D,U,neighbor = generate_transform_matrices(ref.v,ref.f,[4]*len(model_params['F']))
 
 
-# A, D, U is Same Length.
-A = list(map(lambda x:x.astype('float32'), A))
-D = list(map(lambda x:x.astype('float32'), D))
-U = list(map(lambda x:x.astype('float32'), U))
-print("A", len(A))
-print("U", len(U))
-print("D", len(D))
+# A and adj is essentially same. but The expression is different.
 
-print(A[0].tocoo().row, " whatis A")
+if available_psbody : 
+    _,A,D,U,neighbor = generate_transform_matrices(ref.v,ref.f,[4]*len(model_params['F']))
 
-print(A[0].shape, " whatis A")
-A = [A[0]]
 
-model_params['A'] = A
-model_params['ds_D'] = D
-model_params['ds_U'] = U
-model_params['adj'] = neighbor 
+    # A, D, U is Same Length.
+    A = list(map(lambda x:x.astype('float32'), A))
+    D = list(map(lambda x:x.astype('float32'), D))
+    U = list(map(lambda x:x.astype('float32'), U))
+    print("A", len(A))
+    print("U", len(U))
+    print("D", len(D))
+
+    A = [A[0]]
+
+    model_params['A'] = A # basically (5023, 5023) values is all 1,0 or 2.
+    model_params['ds_D'] = D
+    model_params['ds_U'] = U
+
+else: 
+    neighbor = generate_neighborhood(ref.v, ref.f)
+model_params['adj'] = neighbor # neighbor is basically (5023, 32)
 
 
 
 model_params['checkpoint_save_path'] =os.path.join('./checkpoints/', model_params['name'])
 model_params['tensorboard_path'] = os.path.join('./summaries/',model_params['name'])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -123,6 +115,11 @@ model = Model.ModelWrapper(**model_params)
 
 
 
+############################################################################
+
+# TRAIN & PREDICT & SUMMARY
+
+############################################################################
 
 if mode == "train":
 
@@ -130,8 +127,8 @@ if mode == "train":
     inputs = datadict['input']
     labels = datadict['labels']    
 
-    inputs = loader.get_data_normalize2(inputs)
-    labels = loader.get_data_normalize2(labels)
+    # inputs = loader.get_data_normalize2(inputs)
+    # labels = loader.get_data_normalize2(labels)
     # labels = loader.get_data_normalize2(labels)
     # print("inputs", inputs)
     # print("inputs", np.max(inputs), np.min(inputs))
@@ -147,8 +144,8 @@ elif mode == "test":
     inputs = datadict['input'][:test_size]
     labels = datadict['labels'][:test_size] 
     print(np.max(inputs))
-    inputs = loader.get_data_normalize2(inputs)
-    labels = loader.get_data_normalize2(labels)
+    # inputs = loader.get_data_normalize2(inputs)
+    # labels = loader.get_data_normalize2(labels)
 
     print(np.max(inputs))
     # labels = loader.get_data_normalize(labels)

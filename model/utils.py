@@ -15,10 +15,10 @@ def _(self : tf.keras.layers.Layer, opt : str):
     if type(opt) == str:
         opt = opt.lower()
         if  opt == "relu": 
-            return tf.keras.layers.ReLU
+            return tf.keras.layers.ReLU()
         elif opt == "leakyrelu": 
             # return tf.keras.activations.leakyrelu
-            return tf.keras.layers.LeakyReLU
+            return tf.keras.layers.LeakyReLU()
         elif opt == "tanh":
             print("tanh")
             return tf.keras.layers.Activation("tanh")
@@ -34,9 +34,9 @@ def _(self : tf.keras.Model, opt : str):
     if type(opt) == str:
         opt = opt.lower()
         if  opt == "relu": 
-            return tf.keras.layers.ReLU
+            return tf.keras.layers.ReLU()
         elif opt == "leakyrelu": 
-            return tf.keras.layers.LeakyReLU
+            return tf.keras.layers.LeakyReLU()
         elif opt == "tanh":
             return tf.keras.layers.Activation("tanh")
     

@@ -152,8 +152,8 @@ class Encoder(tf.keras.Model):
         self.adj = adj 
         self.latent_size = latent_size
         self.use_latent = use_latent
-        self.activation = activation 
-        self.activation_layer = set_activation(self, self.activation)# it return activation class. use activation build it. see also utils.set_activation
+        self.activation_name = activation 
+        # self.activation_layer = set_activation(self, self.activation)# it return activation class. use activation build it. see also utils.set_activation
         self.kernel_size = kernel_size
         self.exec_list = []
         self.latent_list = []

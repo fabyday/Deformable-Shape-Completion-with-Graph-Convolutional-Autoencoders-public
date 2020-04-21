@@ -7,6 +7,9 @@ from . import noise
 import tqdm
 from . import mesh
 class DirectoryManager():
+    """
+        experimental dir manager class. ... :)
+    """
     def __init__(self, dir_path, target_ext, recursive = True):
         if type(target_ext) != type([]):
             target_ext=[target_ext]
@@ -25,6 +28,9 @@ class DirectoryManager():
 
 
 class DataProcessor():
+    """
+        it loads training or testing data. after data was preprocessed.
+    """
     __default_name = "data.npy"
     def __init__(self, data_path,
                 reference_face_file, 
@@ -89,6 +95,10 @@ class DataProcessor():
     
 
 class DataPreprocessor():
+    """
+        preprocess mesh data (obj, ply.. and so on.) to npy file.
+        it is basically divided by expression directory name.
+    """
     def __init__(self, input_dir_list, output_dir_list):
         """
             input_dir_list : 
@@ -166,6 +176,10 @@ class DataPreprocessor():
         
 
 class NoiseProcessor():
+    """
+        add gaussian noise to preprocessed mesh data.
+        TODO Hole noise maybe not implemented.
+    """
     __noise_type = {"sparse" : 'noise', "hole" : 'hole'}
     def __init__(self, input_dir, output_dir, noise_type, template_face = None, living_vertex_info=None):
         """
