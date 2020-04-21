@@ -789,6 +789,10 @@ class LinearLayer(tf.keras.layers.Layer):
         
 
 class Pool(tf.keras.layers.Layer):
+    """
+        pooooooooooooooooooooooooooool
+        provide mean, max, min pooling.
+    """
     
     __setter_dict = {
                     "mean" : tf.keras.backend.mean,
@@ -847,7 +851,10 @@ class Pool(tf.keras.layers.Layer):
         return result
 
 class MeanPool(tf.keras.layers.Layer):
-    
+    """
+        nameing mistake. it's unpooling.
+        only provide average unpooling.
+    """
     def __init__(self, name):
         """
             name : layer's name

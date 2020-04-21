@@ -1,0 +1,26 @@
+Deformable Shape Completion with Graph Convolutional Autoencoders-public
+
+
+it is based on Deformable Shape Completion with Graph Convolutional Autoencoders paper's implementation.
+
+
+__Configurations
+
+numpy
+tensorflow-gpu 2.0 or 2.1
+libigl for python.
+
+just using requirements.txt
+
+____
+/datapreprocessing.
+1. first download CoMA dataset files.(it's need login.)
+2. extract files. and remove readme in CoMA dataset. 
+3. make one more folder(I actually named ./unrpocessed_dataset), and put renamed CoMa folder( rename plain ) on.
+4. run fileconverter.py. before using fileconverter, and write your own data root path(for me. ./unprocessed_dataset) _target_input_dir variable in fileconverter.
+
+____
+/run model
+
+python main.py [ train | test | summary ]
+

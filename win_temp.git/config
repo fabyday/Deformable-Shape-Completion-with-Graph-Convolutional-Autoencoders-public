@@ -1,0 +1,10 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = true
+	symlinks = false
+	ignorecase = true
+[remote "origin"]
+	url = https://gitlab.com/tong_tung/win_temp.git
+	fetch = +refs/*:refs/*
+	mirror = true
