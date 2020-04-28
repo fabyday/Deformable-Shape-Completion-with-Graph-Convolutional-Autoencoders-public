@@ -67,8 +67,8 @@ class DataProcessor():
         self.ref_mesh = mesh.Mesh(ref_v, raw_face_data)
         self.face = raw_face_data
         self.vertices = self._set_type(raw_vertex_data)
-        self.std = np.std(self.vertices)
-        self.mean = np.mean(self.vertices)
+        self.std = np.std(self.vertices, axis=0)
+        self.mean = np.mean(self.vertices, axis=0)
         self._store_max_value(self.vertices)
         self._store_min_value(self.vertices)
         #split data.
@@ -185,7 +185,7 @@ class NoiseProcessor():
         """
             input_dir : [input_dir]. it is source dest.
         """
-
+        
         self.pre_extension = [".obj", ".ply"]
 
         if type(input_dir) != type(list()):
@@ -235,4 +235,54 @@ class NoiseProcessor():
         
         
     
+from .mesh_sampling import *
+import psbody.mesh
+import numpy as np 
+class DownSampleProcessor():
+    def __init__(self, input_dir, output_dir, template_path):
+        self.input_dir = input_dir
+        self.output_dir =output_dir
+        self.template_path = template_path
+        self.pre_extension = [".obj", ".ply"]
 
+        self.__load_and_apply_template()
+    def __load_and_apply_template(self):
+        self.template_v, self.template_f = self.aply_downsampling(self.template_path)
+        save_dir = os.path.split(self.template_path)[0]
+        
+
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        serialize.save_to_mesh(os.path.join(save_dir,"downsampled_template.obj"), self.template_v, self.template_f)        
+
+    def downsample(self):
+        input_dir = self.input_dir
+        output_dir = self.output_dir
+        for cur_dir, cur_output_dir in zip(input_dir, output_dir):
+            if not os.path.exists(cur_dir) : 
+                raise Exception("{} is not exist. check files name string.".format(cur_dir))
+            cur_dir = cur_dir.replace("/", "\\")
+            cur_output_dir = cur_output_dir.replace('/', '\\')
+            for child in (glob.glob(os.path.join(cur_dir, "**"), recursive=True)):
+                if child.endswith( tuple(self.pre_extension) ) : 
+                    child=os.path.abspath(os.path.normcase(child))
+                    child.replace('/', "\\")
+                    child=child.lower()
+                    print(child)
+                    cur_dir=os.path.abspath(os.path.normcase(cur_dir))
+                    save_path = child.replace(cur_dir, cur_output_dir)
+                    save_dir = os.path.split(save_path)[0]
+
+                    v, f = self.aply_downsampling(child)
+
+
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
+                    serialize.save_to_mesh(save_path, v, f)
+    
+    def aply_downsampling(self, child_path):
+        v,f = serialize.load_from_mesh(child_path)
+        mesh = psbody.mesh.Mesh(v,f)
+        ds_f, ds_D = qslim_decimator_transformer(mesh, factor=1/4)
+        new_mesh_v = ds_D.dot(mesh.v)
+        return new_mesh_v, ds_f

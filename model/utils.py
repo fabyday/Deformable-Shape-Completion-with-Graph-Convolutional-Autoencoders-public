@@ -43,31 +43,50 @@ def _(self : tf.keras.Model, opt : str):
     else : 
         return opt
 
+def set_initializer(name):
+    if name == "xavier_normal_initializer":
+        return tf.keras.initializers.GlorotNormal()
+    elif name == "xavier_uniform_initializer" : 
+        return tf.keras.initializers.GlorotUniform()
+    elif name == "truncated_normal_initializer":
+        return tf.keras.initializers.TruncatedNormal()
+    elif name == "random_normal_initializer":
+        return tf.keras.initializers.RandomNormal()
+    elif name == "random_uniform_initializer":
+        return tf.keras.initializers.RandomUniform()
+    else : 
+        return tf.keras.initializers.TruncatedNormal()
 
 
 def builder():
     pass
 
 def draw_weight(model):
+    import numpy as np 
     encoder = model.encoder
     decoder = model.decoder
-    evar = encoder.variables
-    dvar = decoder.variables
-
-    fig, axs = plt.subplots(3)
-    import numpy as np 
-    data = evar[0].numpy()
-    test = data
-    data = np.transpose(data, [1,0,2])
-    print("is right", data[1] == test[:,1,:])
+    evar = encoder.exec_list
+    dvar = decoder.exec_list
     cm = 'RdYlBu'
-    print(evar[0].shape)
-    for i in range(3):
-        ax = axs[i]
-        pcm = ax.pcolormesh(data[i], cmap=cm)
+    
+    for layer in evar+dvar:
+        a=            len(layer.trainable_variables)
+        fig, axs = plt.subplots()
+        for var in layer.trainable_variables : 
             
-        fig.colorbar(pcm, ax = ax)
-   
+            data = var.numpy()
+            name = var.name
+            ax = axs[i]
+            ax.set_aspect('equal')
+            pcm = ax.pcolormesh(data[i], cmap=cm)
+            fig.colorbar(pcm, ax = ax)
+
+
+
+
+
+    
+    
     plt.show()
 
 
@@ -90,7 +109,6 @@ def draw_weight(model):
         pcm = ax.pcolormesh(data[i], cmap=cm)
         
         
-        fig.colorbar(pcm, ax = ax)
    
     plt.show()
 

@@ -20,8 +20,8 @@ import tensorflow as tf
 import numpy as np 
 from .logger import * #set_device, time_set
 import os 
-from .model_exp import Model, loss
-# from .model_exp import Model, loss
+from .model_exp2 import Model, loss
+# from .model_sung_the_uk import Model, loss
 import copy 
 from .utils import *
 
@@ -30,7 +30,7 @@ from .utils import *
 
 
 #if you want to run eagerly. use tf.config.experimental_run_functions_eagerly(True)
-# tf.config.experimental_run_functions_eagerly(True)
+tf.config.experimental_run_functions_eagerly(True)
 Model = Model
 model_loss = loss
 
@@ -51,6 +51,7 @@ class ModelWrapper:
                 ds_D,
                 ds_U,
                 A,
+                kernel_initializer,
                 checkpoint_save_path,
                 tensorboard_path,
                 ):
@@ -73,7 +74,7 @@ class ModelWrapper:
         self.tensorboard_path = tensorboard_path 
         self.num_epochs = num_epoch
         self.face=face
-        
+        self.kernel_initializer = kernel_initializer
 
         self.optimizer = None
         self.loss_func = None 
@@ -85,6 +86,7 @@ class ModelWrapper:
         self._build()
         self._basic_postconfigure()
         self._custom_postconfigure()
+
 
     # ==========CONFIGURE==================
     def _basic_preconfigure(self):
@@ -103,6 +105,7 @@ class ModelWrapper:
         session = tf.compat.v1.Session(config=config)
 
     def _custom_preconfigure(self): 
+        # self.optimizer  = tf.keras.optimizers.Adam(learning_rate=10e-8)
         self.optimizer  = tf.keras.optimizers.Adam()
         self.loss_func = model_loss
         
@@ -126,6 +129,7 @@ class ModelWrapper:
                             ds_D = self.ds_D,
                             ds_U = self.ds_U,
                             A = self.A,
+                            kernel_initializer=self.kernel_initializer,
                             name = "Model",
                             trainable = True
                             )
