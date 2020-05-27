@@ -5,13 +5,20 @@ this is incomplete yet.
 
 
 ## Model Arch
-model_exp2.py is actual model file.
+model_exp2.py is actual model file.  
+modelwrapper2.py is current model file.
 #### called by 
 
 
 ##### main.py -> modelwrapper.py -> model_exp2.py (it include model and loss )
+##### main2.py -> modelwrapper2.py -> feastnet.py
+## ISSUE
+adam optimizer gradient variables is too big. need to divide at more GPU.  
+( it seem to allow custom training loop. not in keras Sequencial Model. )
 
 
+
+### Arch Detail  
 
 <pre>
 Input = (batch_size = ?, vertice_size = 5023, Feature_input = 3)
@@ -98,7 +105,7 @@ just using requirements.txt
 ## run model
 
 <pre>
-python main.py [ train | test | summary ]
+python main2.py [ train | test | summary ]
 </pre>
 
 

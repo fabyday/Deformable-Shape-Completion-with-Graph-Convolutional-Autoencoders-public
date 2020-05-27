@@ -19,44 +19,10 @@ device = "GPU:1"
         
 @tf.function
 def loss(y_label, y_pred, args=None):
-        def log_normal_pdf(sample, mean, logvar, raxis=1): 
-            log2pi = tf.math.log(2. * np.pi)
-            return tf.reduce_sum(-.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi), axis=raxis)
         
         total_loss = tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(y_label-y_pred, 2.0), axis=-1)), axis=-1)
-        # total_loss = tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(y_label-y_pred, 2.0), axis=-1)))
-        # total_loss =tf.keras.losses.binary_crossentropy( y_pred, y_label )
-        # total_loss = tf.keras.backend.mean(total_loss, axis=-1)
-        # print("total loss shape is ", total_loss, tf.keras.backend.sum(total_loss[0]), tf.keras.backend.mean(total_loss[0]))
-        if type(args) == list and len(args) == 3:            
-            
-            latent_z = args[0]
-            z_mean = args[1]
-            z_log_var = args[2]
-
-            assert len(latent_z.shape) == 3, "latent_z.shape is not 3d"
-            assert len(z_mean.shape) == 3, "latent_z.shape is not 3d"
-            assert len(z_log_var.shape) == 3, "latent_z.shape is not 3d"
-
-            z_mean = tf.squeeze(z_mean)
-            z_log_var = tf.squeeze(z_log_var)
-            latent_z = tf.squeeze(latent_z)
-
-    
-            kl_loss=  tf.keras.backend.mean(1 + z_log_var - tf.keras.backend.square(z_mean) - tf.keras.backend.exp(z_log_var), axis=-1)
-            # kl_loss = tf.keras.backend.sum(kl_loss, axis = - 1)
-
-            # kl_loss = tf.keras.losses.KLD(y_label, y_pred)
-            # print(total_loss, kl_loss)
-            # kl_loss = 1 + z_log_var - tf.keras.backend.square(z_mean) - tf.keras.backend.exp(z_log_var)
-            # kl_loss = tf.keras.backend.mean(kl_loss, axis=-1)
-            kl_loss *= +10e-8
-            # print("total loss shape is ", kl_loss)
-            total_loss += kl_loss
+      
         total_loss = tf.keras.backend.mean(total_loss )
-            # kl_loss = tf.reduce_mean(tf.reduce_sum(1 + 2 * z_log_var - tf.square(z_mean) - tf.square(tf.exp(z_log_var)), 1))
-            # total_loss -= 10e-6*( kl_loss)
-        # total_loss = tf.keras.backend.mean(total_loss, axis = 0)
         
         return total_loss
 
@@ -183,59 +149,29 @@ class Encoder(tf.keras.Model):
 
 
     def build(self, input_shape):
-
-        for A in self.A:
-            coo = A.tocoo()
-            # print(coo)
-            indices = np.mat([coo.row, coo.col]).transpose()
-            sparse_A_tensor = tf.sparse.SparseTensor(indices, coo.data, coo.shape)
-            sparse_A_tensor = tf.sparse.expand_dims(sparse_A_tensor, axis=0)
-            # print(sparse_A_tensor.shape)
-            self.sparse_A_tensor.append( tf.sparse.concat( 0, [sparse_A_tensor for _ in range(input_shape[0])] ) )
-          
-
-        
-        
-        self.exec_list.append((LinearLayer(
-                                    output_shape=self.layer_info[1],
-                                    kernel_initializer=set_initializer(self.kernel_initializer),
-                                    # use_bias=False,
-                                    use_bias = True,
-                                    bias_initializer=tf.keras.initializers.TruncatedNormal(),
-                                    # activation=self.activation_name,
-                                    # use_batchnorm=True,
-                                    activation=None,
-                                    use_batchnorm=False,
-                                    name="InputLayer",
-                                    trainable=True
-                                    ),False))
-        self.exec_list.append((tf.keras.layers.BatchNormalization(), False))
-        self.exec_list.append((set_activation(self, self.activation_name), False))
-
-        for idx, output_size in enumerate(self.layer_info[2:]): 
-                
-            preset = dict()
-            preset['translation_invariant'] = True
-            preset['num_weight_matrices'] = self.kernel_size
-            preset['num_output_channels'] = output_size
-            preset['initializer'] = set_initializer(self.kernel_initializer)
-            preset['name'] = "enc_" + str(idx)
-            
-            layer = tfg.FeatureSteeredConvolutionKerasLayer(**preset)
-            
-            self.exec_list.append((layer, True))
-            if idx != len(self.layer_info[2:]) - 1 :
-                self.exec_list.append((tf.keras.layers.BatchNormalization(), False))
-            self.exec_list.append((set_activation(self, self.activation_name), False))
-
                                                                                                 
-        
+        self.exec_list.append(ConvNet(output_channel = 16, 
+                                        kernel_initializer = set_initializer(self.kernel_initializer),
+                                        activation=None, 
+                                        neighbor=self.adj[0], 
+                                        name = "true", 
+                                        trainable=True))
+        self.exec_list.append(set_activation(self, self.activation_name))
+        self.exec_list.append(ConvNet(output_channel = 16, 
+                                        kernel_initializer = set_initializer(self.kernel_initializer),
+                                        activation=None, 
+                                        neighbor=self.adj[0], 
+                                        name = "true", 
+                                        trainable=True))
+        self.exec_list.append(set_activation(self, self.activation_name))                                        
+                                       
 
         if self.use_latent : 
-            self.exec_list.append((Pool(name="pool", pooling_type="mean", axis=1), False))        
-
+            # pass
+            self.exec_list.append(lambda x : tf.reshape(x, [-1, 1, tf.shape(x)[1]*tf.shape(x)[2]]))
             self.latent_list.append(LinearLayer(
-                                    output_shape=self.latent_size,
+                                    # output_shape=self.latent_size,
+                                    output_shape=32,
                                     kernel_initializer=set_initializer(self.kernel_initializer),
                                     use_bias = True,
                                     bias_initializer=tf.keras.initializers.TruncatedNormal(),
@@ -244,39 +180,20 @@ class Encoder(tf.keras.Model):
                                     name="sig",
                                     trainable=True
                                     ))
-            self.latent_list.append(LinearLayer(
-                                    output_shape=self.latent_size,
-                                    kernel_initializer=set_initializer(self.kernel_initializer),
-                                    use_bias = True,
-                                    bias_initializer=tf.keras.initializers.TruncatedNormal(),
-                                    activation=None,
-                                    use_batchnorm=False,
-                                    name="mu",
-                                    trainable=True
-                                    ))
+            # self.latent_list.append(LinearLayer(
+            #                         output_shape=self.latent_size,
+            #                         kernel_initializer=set_initializer(self.kernel_initializer),
+            #                         use_bias = True,
+            #                         bias_initializer=tf.keras.initializers.TruncatedNormal(),
+            #                         activation=None,
+            #                         use_batchnorm=False,
+            #                         name="mu",
+            #                         trainable=True
+            #                         ))
 
 
 
                                                         
-        
-           
-
-    def latent_op(self, x):
-        def sampling(args):
-            z_mean, z_log_var = args
-            epsilon = tf.keras.backend.random_normal(shape=tf.shape(z_mean))
-
-            return z_mean + tf.keras.backend.exp(0.5 * z_log_var) * epsilon
-
-            
-        vals =[]
-        # shape = tf.shape(x)
-        # x = tf.reshape(x, [shape[0], shape[1]*shape[-1]])
-        for op in self.latent_list:
-            vals.append(op(x))
-        z_mean, z_log_var = vals[0], vals[1]
-        # print("z_mean", z_mean.shape)
-        return sampling(vals), z_mean, z_log_var
         
     @tf.function
     @set_device("GPU:0")        
@@ -285,18 +202,17 @@ class Encoder(tf.keras.Model):
         # tf.print("input : \n{}\n".format(x))
         # tf.print("=======================")
 
-        for layer, need_neighbor in (self.exec_list):
-            if need_neighbor : 
-                x = layer([x, self.sparse_A_tensor[0]])
-            else : 
-                x = layer(x)
+        for layer in (self.exec_list):
+    
+            x = layer(x)
             # print(layer)
         # print("enc", x.shape)
 
         if self.use_latent : 
-            x, z_mean, z_log_var = self.latent_op(x)
+            # x, z_mean, z_log_var = self.latent_op(x)
             # print("enc x shape", x.shape)
-            return x, z_mean, z_log_var
+            # return x, z_mean, z_log_var
+            return self.latent_list[0](x)
         return x 
     
     @tf.function
@@ -363,8 +279,8 @@ class Decoder(tf.keras.Model):
         if self.use_latent: 
 
             self.exec_list.append((LinearLayer(
-                                    # output_shape=self.layer_info[0]*self.vertex_size, 
-                                    output_shape=128, 
+                                    output_shape=16*self.vertex_size, 
+                                    # output_shape=128, 
                                     kernel_initializer=set_initializer(self.kernel_initializer),                                    # use_bias=False,
                                     use_bias = True,
                                     bias_initializer=tf.keras.initializers.TruncatedNormal(),
@@ -374,49 +290,43 @@ class Decoder(tf.keras.Model):
                                     use_batchnorm=False,
                                     name="Linear_Input",
                                     trainable=True
-                                    ), False))
-            self.exec_list.append((lambda x : tf.reshape(x, [tf.shape(x)[0], self.vertex_size, -1]),False))
-            self.exec_list.append((tf.keras.layers.BatchNormalization(), False))
-            self.exec_list.append((set_activation(self, self.activation_name), False))
+                                    )))
             
-            self.exec_list.append((tf.keras.layers.Reshape([input_shape[0], self.vertex_size, -1]), False))
-            self.exec_list.append((lambda x : tf.reshape(x, [tf.shape(x)[0], self.vertex_size, -1]),False))
-
-            self.exec_list.append((MeanPool(name="unpool"),False))
-        for idx, output_size in enumerate(self.layer_info[1:-1]): 
-
-                
-            preset = dict()
-            preset['translation_invariant'] = True
-            preset['num_weight_matrices'] = self.kernel_size
-            preset['num_output_channels'] = output_size
-            preset['initializer'] = set_initializer(self.kernel_initializer)
-
-            preset['name'] = "dec_" + str(idx)
+            # self.exec_list.append((tf.keras.layers.BatchNormalization()))
+            self.exec_list.append((lambda x : tf.reshape(x, [tf.shape(x)[0], self.vertex_size, -1])))
             
-            layer = tfg.FeatureSteeredConvolutionKerasLayer(**preset)
             
-            self.exec_list.append((layer, True))
-            if idx != len(self.layer_info[1:-1]) - 1 :
-                self.exec_list.append((tf.keras.layers.BatchNormalization(), False))
-            self.exec_list.append((set_activation(self, self.activation_name), False))
+            
 
-                                        
+        self.exec_list.append(ConvNet(output_channel = 16, 
+                                        kernel_initializer = set_initializer(self.kernel_initializer),
+                                        activation=None, 
+                                        neighbor=self.adj[0], 
+                                        name = "true", 
+                                        trainable=True))
+        self.exec_list.append(set_activation(self, self.activation_name))
 
-        self.exec_list.append((LinearLayer(
+        self.exec_list.append(ConvNet(output_channel = 16, 
+                                        kernel_initializer = set_initializer(self.kernel_initializer),
+                                        activation=None, 
+                                        neighbor=self.adj[0], 
+                                        name = "true", 
+                                        trainable=True))
+        self.exec_list.append(set_activation(self, self.activation_name))                                        
+        self.exec_list.append(ConvNet(output_channel = 16, 
+                                        kernel_initializer = set_initializer(self.kernel_initializer),
+                                        activation=None, 
+                                        neighbor=self.adj[0], 
+                                        name = "true", 
+                                        trainable=True))
+        self.exec_list.append(set_activation(self, self.activation_name))                                        
+        self.exec_list.append(ConvNet(output_channel = 3, 
+                                        kernel_initializer = set_initializer(self.kernel_initializer),
+                                        activation=None, 
+                                        neighbor=self.adj[0], 
+                                        name = "true", 
+                                        trainable=True))                                                                                
 
-                                    output_shape= self.layer_info[-1], 
-                                    kernel_initializer=set_initializer(self.kernel_initializer),
-                                    # use_bias=False,
-                                    use_bias = True,
-                                    bias_initializer=tf.keras.initializers.TruncatedNormal(),
-                                    activation=None,
-                                    use_batchnorm=False,
-                                    # activation=self.activation,
-                                    name="Lenear_Output",
-                                    trainable=True
-                                    ), False))
-                
         print("build complete Decoder")
         
     @tf.function
@@ -424,15 +334,63 @@ class Decoder(tf.keras.Model):
     def call(self, inputs):
         x = inputs
 
-        for layer, need_neighbor in (self.exec_list):
-            if need_neighbor : 
-                x = layer([x, self.sparse_A_tensor[0]])
-            else : 
-                x = layer(x)
+        for layer in (self.exec_list):
+            print("x.shape", x.shape)
+            x = layer(x)
             # print(layer.name,x.shape)
 
             
         return x 
+
+
+class ConvNet(tf.keras.layers.Layer):
+    def __init__(self, output_channel, kernel_initializer, activation, neighbor, name, trainable=True):
+        super(ConvNet, self).__init__(trainable=trainable, name = name)
+        self.neighbor = neighbor
+        self.output_channel = output_channel 
+        self.kernel_initializer = kernel_initializer
+        self.act = activation
+
+    def build(self, input_shape):
+        #weight for point
+        _, self.vertice, self.Fin = input_shape
+        self.Wx = self.add_weight (name = "Wx",
+                                     shape=[self.Fin, self.output_channel],
+                                     initializer =  self.kernel_initializer
+                                     )
+        #weight for neighbor
+        self.Wn = self.add_weight (name = "Wn",
+                                     shape=[self.Fin, self.output_channel],
+                                     initializer = self.kernel_initializer
+                                     )
+
+        self.b = self.add_weight (name = "b",
+                                     shape=[self.output_channel],
+                                     initializer =  tf.keras.initializers.zeros()
+                                     )
+
+
+    def point_calc(self, x):
+        return tf.map_fn(lambda x  : tf.matmul(x, self.Wx), x)
+        
+
+    def neighbor_calc(self, x):
+
+        def compute_nb_feature(inputs):
+            return tf.gather(inputs, self.neighbor)
+        
+        padding_feature = tf.zeros([tf.shape(x)[0], 1, self.Fin], tf.float32)
+        padded_input = tf.concat([padding_feature, x], 1)
+
+        nb_feature = tf.reduce_sum(tf.map_fn(compute_nb_feature, padded_input), axis=2)/tf.cast(tf.shape(self.neighbor)[-1], tf.float32)
+        nb_feature = tf.map_fn(lambda x : tf.matmul(x, self.Wn), nb_feature)
+
+        return nb_feature
+
+
+    def call(self, x):
+        return self.point_calc(x) + self.neighbor_calc(x) + self.b
+    
 
 
 
@@ -481,116 +439,17 @@ class LinearLayer(tf.keras.layers.Layer):
     
     @tf.function
     def call(self, inputs) : 
-        # if len(inputs.shape) == 2 : 
-        #     inputs=tf.expand_dims(inputs, axis=1)
-        # tf.print(inputs.shape)
-        # print(inputs.shape)
+        
         assert len(inputs.shape) == 3, "input_shape length must be 3-dimension. it is {}".format(len(inputs))
 
         result = tf.map_fn(lambda x: tf.matmul(x, self.W), inputs)
+        print("result shape", result.shape)
         if self.use_bias : 
             result += self.b 
         assert len(result.shape) == 3, "return value length must be 3-dimension. it is {}".format(len(inputs))
         
-        if self.use_batchnorm : 
-            result = self.batch_norm(result, training=self.trainable)
-
-        if self.activation_func != None:
-             result = self.activation_func(result)
-
         return result 
         
 
-class Pool(tf.keras.layers.Layer):
-    """
-        pooooooooooooooooooooooooooool
-        provide mean, max, min pooling.
-    """
-    
-    __setter_dict = {
-                    "mean" : tf.keras.backend.mean,
-                    "max" : tf.keras.backend.max,
-                    "min" : tf.keras.backend.min
-                    }
-
-    def __init__(self, name, pooling_type, axis=1, keep_dims=True):
-        """
-            name : layer's name
-            pooling type : choose string in {max, mean, min}. it find pooling type that you want. 
-
-        """
-        super(Pool, self).__init__(name="pool_")
-        self.pooling_type = pooling_type
-        self.axis = axis
-        self.keep_dims = keep_dims
-        self.pool_func = self.select_pool(pooling_type)
-
-    def build(self, inputs_shape):
-        """
-            build do nothing.
-        """
-        pass
-    
-    def select_pool(self, pooling_type):
-        """
-        
-            pooling_type : choose string in {max, mean, min}. it find pooling type that you want. 
-
-        """
-        
-        def wrapper(function, *args, **kwrags):
-            def pool_func(inputs):
-                if function == None : 
-                    return inputs
-                return function(inputs, *args, **kwrags)
-            return pool_func
-
-        choosed_function = None
-        if type(pooling_type) != str : 
-            raise Exception("pooling type is not string")
-
-        if pooling_type in Pool.__setter_dict:
-            choosed_function =  Pool.__setter_dict[pooling_type]
-        else : 
-            raise Exception("uncorrect pooling typename")
-
-        return wrapper(choosed_function, self.axis, self.keep_dims)
-
-
-
-    def call(self, inputs):
-        result = self.pool_func(inputs)
-        # print("pooling", result.shape)
-        return result
-
-class MeanPool(tf.keras.layers.Layer):
-    """
-        nameing mistake. it's unpooling.
-        only provide average unpooling.
-    """
-    def __init__(self, name):
-        """
-            name : layer's name
-            pooling type : choose string in {max, mean, min}. it find pooling type that you want. 
-
-        """
-        super(MeanPool, self).__init__(name="pool_mean")
-       
-
-    def build(self, inputs_shape):
-        """
-            build do nothing.
-        """
-        pass
-    
-  
-    def call(self, inputs):
-        # batch_size, 1, 128
-        # inputs= tf.expand_dims(inputs, axis=1)
-        # assert len(inputs.shape) != 3 , "length is not 3."
-        result = tf.tile(inputs, [1,5023,1])
-        # assert result.shape != [4, 5023, 128], "error"
-        # print("mean pool", result.shape)
-        return result
 
 

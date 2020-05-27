@@ -1,9 +1,9 @@
+
 import numpy as np 
 
 
 import os 
 import time 
-import model.modelwrapper as Model
 import random 
 import copy 
 import json 
@@ -33,7 +33,8 @@ else :
 
 #common sets
 name="test_model_2020_3sd-reiqwen"
-name="main_im"
+name="var_relu_small_relu_plz"
+name="mode_vae_1"
 
 
 #loader sets
@@ -55,11 +56,11 @@ model_params = dict()
 model_params['name'] = name
 model_params['random_seed'] = 30000
 model_params['batch_size'] = 2
-model_params['kernel_size'] = 6
+model_params['kernel_size'] = 2
 
 model_params['num_epoch'] = 200
 # model_params['F'] = [16, 32]#, 64, 96, 128] ### input_shape      [ hidden_layer_output_shape1 ... ]
-model_params['F'] = [16,32, 64]#, 128]#, 64, 96]#, 128] ### input_shape      [ hidden_layer_output_shape1 ... ]
+model_params['F'] = [16,32, 64, 96, 128] ### input_shape      [ hidden_layer_output_shape1 ... ]
 model_params['use_latent'] = True 
 model_params['latent_size'] = model_params['F'][-1]
 model_params['F_0'] = loader.get_train_shape()[-1]
@@ -88,7 +89,7 @@ if available_psbody :
     print("U", len(U))
     print("D", len(D))
     A=A[0]
-    A.data = A.data/A.data
+    A.data = A.data / A.data
     A = [A]
 
     model_params['A'] = A # basically (5023, 5023) values is all 1,0 or 2.
@@ -114,11 +115,13 @@ model_params['tensorboard_path'] = os.path.join('./summaries/',model_params['nam
 ############################################################################
 
 
-
-model = Model.ModelWrapper(**model_params)
-
+print(np.max(np.sum(A[0].toarray(), -1)), A[0].toarray().shape , "wahtis")
 
 
+import model.modelwrapper3 as mod2
+print("nei.............", neighbor[0].shape)
+model = mod2.get_vae(A[0], model_params['batch_size'])
+model = mod2.get_vae(neighbor[0], model_params['batch_size'])
 
 ############################################################################
 
@@ -132,17 +135,12 @@ if mode == "train":
     inputs = datadict['input']
     labels = datadict['labels']    
 
-    inputs = loader.get_data_normalize2(inputs)
-    labels = loader.get_data_normalize2(labels)
+    # inputs = loader.get_data_normalize2(inputs)
+    # labels = loader.get_data_normalize2(labels)
     
-    # loader.save_ply(np.expand_dims(loader.label_facedata.std, axis=0), name="pred", path="./test/"+"file")
-    # loader.save_ply(np.expand_dims(loader.label_facedata.mean, axis=0), name="pred", path="./test/"+"test")
-
-    # print("inputs", inputs)
-    # print("inputs", np.max(inputs), np.min(inputs))
-    model.train(inputs, labels)
-
-
+    # model.train(inputs, labels)
+    
+    mod2.fit(model, inputs, 100, name)
 elif mode == "test":
     # print("test mode")
     # datadict = loader.get_test_data()
@@ -152,23 +150,27 @@ elif mode == "test":
     inputs = datadict['input'][:test_size]
     labels = datadict['labels'][:test_size] 
     # print(np.max(inputs))
-    inputs = loader.get_data_normalize2(inputs)
-    labels = loader.get_data_normalize2(labels)
+    # inputs = loader.get_data_normalize2(inputs)
+    # labels = loader.get_data_normalize2(labels)
 
     
-
+    pred = mod2.pred(model, inputs, name)
     print(np.max(inputs))
     # labels = loader.get_data_normalize(labels)
-    pred, loss = model.predict(inputs=inputs,labels=labels,  batch_size=2)
-    print("pred losses loss : ", loss)
+    # pred, loss = model.predict(inputs=inputs,labels=labels,  batch_size=2)
+
+    mod2.summary(model)
     
-    # loader.save_ply(pred, name="pred", path="./conv_ply/"+name)
-    # loader.save_ply(inputs, name = "test",path="./conv_ply/"+name)    
-    # loader.save_ply(labels, name = "orig",path="./conv_ply/"+name)    
+
+    # print("pred losses loss : ", loss)
     
-    loader.save_ply(loader.get_data_denormalize2(pred), name="pred", path="./conv_ply/"+name)
-    loader.save_ply(loader.get_data_denormalize2(inputs), name = "test",path="./conv_ply/"+name)    
-    loader.save_ply(loader.get_data_denormalize2(labels), name = "orig",path="./conv_ply/"+name)    
+    loader.save_ply(pred, name="pred", path="./conv_ply/"+name)
+    loader.save_ply(inputs, name = "test",path="./conv_ply/"+name)    
+    loader.save_ply(labels, name = "orig",path="./conv_ply/"+name)    
+    
+    # loader.save_ply(loader.get_data_denormalize2(pred), name="pred", path="./conv_ply/"+name)
+    # loader.save_ply(loader.get_data_denormalize2(inputs), name = "test",path="./conv_ply/"+name)    
+    # loader.save_ply(loader.get_data_denormalize2(labels), name = "orig",path="./conv_ply/"+name)    
 
     model.summary()
 elif mode == "summary":

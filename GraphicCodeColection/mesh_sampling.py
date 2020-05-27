@@ -307,10 +307,14 @@ def generate_neighborhood(vertex, face):
     
     for f_data_list in face:
         for i, vertex_num in enumerate(f_data_list):
-                if f_data_list[(i+1)%3] not in neighbour[vertex_num]:
-                    neighbour[vertex_num].append(f_data_list[(i+1)%3])
-                if f_data_list[(i+2)%3] not in neighbour[vertex_num]:
-                    neighbour[vertex_num].append(f_data_list[(i+2)%3])
+                if (f_data_list[(i+1)%3]+1) not in neighbour[vertex_num]:
+                # if (f_data_list[(i+1)%3]) not in neighbour[vertex_num]:
+                    neighbour[vertex_num].append(f_data_list[(i+1)%3] + 1)
+                    # neighbour[vertex_num].append(f_data_list[(i+1)%3])
+                if (f_data_list[(i+2)%3]+1) not in neighbour[vertex_num]:
+                # if (f_data_list[(i+2)%3]) not in neighbour[vertex_num]:
+                    # neighbour[vertex_num].append(f_data_list[(i+2)%3])
+                    neighbour[vertex_num].append(f_data_list[(i+2)%3] + 1)
                 
 
 

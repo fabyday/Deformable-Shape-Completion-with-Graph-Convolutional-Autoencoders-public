@@ -133,10 +133,11 @@ class Loader(object):
         return inputs
         
     def get_data_normalize2(self, data):
-        return (data - self.label_facedata.mean) / self.label_facedata.std
+        return (data - self.label_facedata.mean)# / self.label_facedata.std
 
     def get_data_denormalize2(self, data):
-        return data * self.label_facedata.std + self.label_facedata.mean
+        # return data * self.label_facedata.std + self.label_facedata.mean
+        return data  + self.label_facedata.mean
         
     def get_train_data(self):
         """

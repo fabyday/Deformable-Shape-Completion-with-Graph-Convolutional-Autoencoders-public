@@ -20,17 +20,16 @@ import tensorflow as tf
 import numpy as np 
 from .logger import * #set_device, time_set
 import os 
-from .model_exp2 import Model, loss
+# from .model_chexp3 import Model, loss
+from .model_exp import Model, loss
+
 # from .model_sung_the_uk import Model, loss
 import copy 
 from .utils import *
 
 # global setting
-
-
-
 #if you want to run eagerly. use tf.config.experimental_run_functions_eagerly(True)
-tf.config.experimental_run_functions_eagerly(True)
+# tf.config.experimental_run_functions_eagerly(True)
 Model = Model
 model_loss = loss
 
@@ -76,7 +75,7 @@ class ModelWrapper:
         self.face=face
         self.kernel_initializer = kernel_initializer
 
-        self.optimizer = None
+        self.optimizer = None #optimizer divided. OOM is the main reason why divide optimizer,  
         self.loss_func = None 
         self.train_summary_writer = None
 
@@ -105,8 +104,8 @@ class ModelWrapper:
         session = tf.compat.v1.Session(config=config)
 
     def _custom_preconfigure(self): 
-        # self.optimizer  = tf.keras.optimizers.Adam(learning_rate=10e-8)
-        self.optimizer  = tf.keras.optimizers.Adam()
+        self.optimizer  = tf.keras.optimizers.Adam(learning_rate=10e-4)
+
         self.loss_func = model_loss
         
         self.encoder_shape_list = [self.F_0] + self.F # [Fin] + [Filter size list]
@@ -114,7 +113,6 @@ class ModelWrapper:
         self.decoder_shape_list = copy.deepcopy(self.encoder_shape_list)
         self.decoder_shape_list.reverse() # decoder shape list := REVERSED [filter size list] + [Fin]
 
-    @set_device("GPU:1")
     def _build(self):
         #Model is only one.
 
@@ -148,16 +146,22 @@ class ModelWrapper:
 
     @tf.function
     def train_batch(self, inputs, labels):
+
         with tf.GradientTape() as tape:
-            result = self.model(inputs)
+            with tf.device("/GPU:0"):
+                result = self.model(inputs)
+
             if type(result) == tuple : 
                 result, latent_z, z_mean, z_log_var = result
                 loss = self.loss_func(y_label = labels, y_pred = result, args=[latent_z, z_mean, z_log_var])
             else:
                 loss = self.loss_func(y_label = result, y_pred = labels)
-            gradient = tape.gradient(loss, self.model.trainable_variables)
-            self.optimizer.apply_gradients(zip(gradient, self.model.trainable_variables))
+
+            with tf.device("/GPU:1"):
+                gradient = tape.gradient(loss, self.model.trainable_variables)
+                self.optimizer.apply_gradients(zip(gradient, self.model.trainable_variables))
         return loss
+
 
 
     # -------------------------------------------------------------------------------------
@@ -171,11 +175,11 @@ class ModelWrapper:
         self.restore_checkpoint()
 
         #save model graph (TODO but it's not work now. can't trace graph.)
-        tf.summary.trace_on(graph=True)
-        self.train_batch(inputs= inputs[:self.batch_size], labels=labels[:self.batch_size])
+        # tf.summary.trace_on(graph=True)
+        # self.train_batch(inputs= inputs[:self.batch_size], labels=labels[:self.batch_size])
 
-        with self.train_summary_writer.as_default():
-            tf.summary.trace_export(name="phase1_graph", step=0)
+        # with self.train_summary_writer.as_default():
+        #     tf.summary.trace_export(name="phase1_graph", step=0)
         
         save_path = self.manager.latest_checkpoint
         
@@ -183,13 +187,19 @@ class ModelWrapper:
         for epoch in range(self.num_epochs):
 
             losses = 0
+            
             for step, begin in enumerate(range(0, size, self.batch_size)):
 
                 self.ckpt.step.assign_add(1)
                 end = begin + self.batch_size
                 end = min([size, end])
-
+                # if step == 0 :
+                    # tf.summary.trace_on(graph=True)
                 loss = self.train_batch(inputs=inputs[begin:end], labels=labels[begin:end])    
+                # if step == 0 :
+                    # with self.train_summary_writer.as_default():
+                        # tf.summary.trace_export(name="phase1_graph", step=0)
+        
                 losses += loss 
                 if step % 5 == 0 : 
                     print_process(epoch, self.num_epochs, (step+1)*self.batch_size, size, loss, save_path)

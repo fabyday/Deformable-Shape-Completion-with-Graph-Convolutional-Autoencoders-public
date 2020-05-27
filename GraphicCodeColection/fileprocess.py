@@ -152,7 +152,8 @@ class DataPreprocessor():
                     os.makedirs(os.path.join(cur_output_dir, exp)) #recursively make directories.
                 serialize.save_to_numpy(os.path.join(cur_output_dir, exp, "data"), v_data)
 
-
+    def convert_mesh2numpy_characterwise(self):
+        pass
 
     def _mesh2numpy(self, path):
         """
