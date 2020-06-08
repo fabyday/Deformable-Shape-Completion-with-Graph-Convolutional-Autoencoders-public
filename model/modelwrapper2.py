@@ -54,7 +54,7 @@ class CVAE(tf.keras.Model):
     self.kernel = 8
     self.initializer = initializer
     # self.adj = tf.constant(self.adj, dtype=tf.int32)
-
+    self.acc = tf.keras.metrics.Accuracy()
     # self.adj = np.expand_dims(self.adj, 0)
     # self.adj = np.concatenate([self.adj for _ in range(batch_size)], axis=0)
     with tf.device("/GPU:0"):
@@ -165,8 +165,9 @@ class CVAE(tf.keras.Model):
 
       # z = self.encode(inputs)
     # print(z.shape, "what is z shape")
-    kl_loss = - 0.5 * tf.reduce_mean(
-                                var - tf.square(mean) - tf.exp(var) + 1, -1)                      
+    # kl_loss = - 0.5 * tf.reduce_sum(
+    #                             var - tf.square(mean) - tf.exp(var) + 1, -1)              
+                    
     # kl_loss *= 10e-8
     # tf.print("="*10, kl_loss)
     # tf.print("kl_loss :\n", kl_loss)
@@ -174,16 +175,34 @@ class CVAE(tf.keras.Model):
     # tf.print("var : \n", var)
     # tf.print("z : \n", z)
     # tf.print("*="*5)
-    self.add_loss(kl_loss)
+    # self.add_loss(kl_loss)
+    # self.add_loss(10e-8*kl_loss)
+
     with tf.device("/GPU:0"):
       out =  self.decode(z)
-      
+      self.acc.reset_states()
       # kl_loss = - 0.5 * tf.reduce_sum(1 + var - tf.square(mean) - tf.exp(var), -1)                                
       # kl_loss = kl_loss
       
       # self.add_loss(kl_loss)
-      # self.add_loss(10e+4)
     # tf.print("whait is vae losses", self.losses)
+    # total_loss = tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(inputs-out, 2.0), axis=-1)), axis=-1)
+    # print(total_loss, "total loss is whats")
+      
+      # total_loss = tf.keras.losses.MSE(inputs, out)
+      total_loss = tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(out-inputs, 2.0), axis=-1)), axis=-1)
+      kl_loss = - 0.5 * tf.reduce_sum(
+                                var - tf.square(mean) - tf.exp(var) + 1, -1)
+      kl_loss = 10e-8 * kl_loss
+      kl_loss = tf.reshape(kl_loss, [-1, 1])
+      vae_loss = tf.keras.backend.mean(kl_loss + total_loss, -1)
+      vae_loss = tf.keras.backend.mean(kl_loss + total_loss)
+      self.add_metric(kl_loss, name='kl_loss', aggregation='mean')
+      self.add_metric(total_loss, name='mse_loss', aggregation='mean')
+      self.acc.update_state(out, inputs)
+      # self.acc.update_state(out, inputs)
+      # self.add_metric(self.acc.update_state(out, inputs).result().numpy(), name="acc",  aggregation='mean')
+      self.add_loss(vae_loss)
     return out
 
 
@@ -191,11 +210,12 @@ def get_vae(adj):
   
   vae = CVAE(batch_size = 2,adj = adj)
   with tf.device("/GPU:1"):
-    optimizer = tf.keras.optimizers.Adam(1e-4)
-    
-    vae.compile(optimizer, loss =tf.keras.losses.MeanSquaredError(), metrics=['accuracy'])
+    optimizer = tf.keras.optimizers.Adam(10e-4)
+    # optimizer = tf.keras.optimizers.Adam(1e-4)
 
-  # vae.compile(optimizer, metrics=['accuracy'])
+    # vae.compile(optimizer, loss =tf.keras.losses.MeanSquaredError(), metrics=['accuracy'])
+
+    vae.compile(optimizer, metrics=['accuracy'])
   return vae
 
 import os
@@ -226,7 +246,9 @@ def fit(vae, x, epochs, name):
   tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
   with tf.device("/GPU:1"):
     cp_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=0, save_weights_only=True,save_freq=5)
-    vae.fit(x, x, epochs=epochs, batch_size = 2, callbacks=[cp_callback, tensorboard_callback])
+    # vae.fit(x, x, epochs=epochs, batch_size = 2, callbacks=[cp_callback, tensorboard_callback])
+    vae.fit( x, epochs=epochs, batch_size = 2, callbacks=[cp_callback, tensorboard_callback])
+
 
 
 def pred(vae, x, name) : 
@@ -244,214 +266,71 @@ def summary(vae):
   vae.generative_net.summary()
   vae.summary()
 
+def phase2_test(vae, x_inputs, x_label, name, batch_size=1):
 
+      
+  checkpoint_path = os.path.join("./checkpoints", name, "cp-{epoch:04d}.ckpt")
+  checkpoint_dir = os.path.dirname(checkpoint_path)
 
+  latest = tf.train.latest_checkpoint(checkpoint_dir)
+  print("load weight... : ", latest)
 
+  vae.load_weights(latest)
+  size=len(x_inputs)
+  iterations = 200
+  decoder = vae.generative_net
+  optimizer = tf.keras.optimizers.SGD(0.6)
+  data_list = [0]*size
+  print("data size : ", size)
+  print("batch_size : ", batch_size)
+  latent = tf.Variable(tf.random.normal([batch_size, 64]), dtype=tf.float32, trainable=True)
 
+  bools = np.not_equal(np.sum(x_inputs, axis=-1), 3.)
+  x_label = np.expand_dims(x_label, 0)
+  x_label = np.concatenate([x_label for _ in range(batch_size)], axis=0)
+  print(x_label.shape, "what is x_labels")
 
-class FeastLayer(tf.keras.layers.Layer):
-
-  def __init__(self, 
-          input_shape,
-          output_shape, 
-          adj = None,
-          kernel_size = 9,
-          activation=tf.keras.activations.relu,
-          is_invariant = False,
-          name = "Layer_",
-          trainable=True):
-    super(FeastLayer, self).__init__(trainable=trainable,name=name)
-    self.output_chanel = output_shape
-
-    self.adj = adj
-    self.kernel_size = kernel_size
-    self.activation_name= activation
-    self.is_invariant = is_invariant
-
-
-  def build(self, input_shape):
-    batch_size, self.vertex_size, self.coord_size = input_shape
-
-    M = self.kernel_size
-    out_channels = self.output_chanel
-    in_channels = self.coord_size
+  for begin in range(0, size, batch_size):
+    end = begin + batch_size
+    end = min([size, end])
+    x_label = x_label.astype(np.float32)
+    print("input shape : ", x_inputs[begin:end].shape)
+    result = inner_train(x_inputs[begin:end], x_label, bools[begin:end],latent, vae, optimizer, iterations)
     
-    self.adj = tf.constant(self.adj, dtype=tf.int32)
-    self.W = self.add_weight(name = "W", shape=[M, out_channels, in_channels], )
-    self.b = self.add_weight(name = "b", shape=[out_channels])
-    self.u = self.add_weight(name = "u", shape=[M, in_channels])
-    if not self.is_invariant : 
-      self.v = self.add_weight(name = "v", shape=[M, in_channels])
-    self.c = self.add_weight(name = "c", shape=[M])
+    data_list[begin:end] = result.numpy()[:]
 
-  def call(self, x):
-    #preprocess for input
-    batch_size = tf.shape(x)[0]
-    input_size, in_channels = self.vertex_size, self.coord_size
-    adj = self.adj
-    K = tf.shape(self.adj)[-1]
-    W = self.W
-    u = self.u 
-    c = self.c
-    b = self.b
-    if not self.is_invariant : 
-      v = self.v
+  return np.array(data_list)
 
 
-    #preprocess for output
-    M = self.kernel_size
-    out_channels = self.output_chanel
+# @tf.function
+def inner_train(x_inputs, x_label, bools,latent, vae, optimizer, iterations = 10000) : 
+
+  mean, var = vae.encode(x_label)
+  # mean, var = vae.encode(x_inputs)
+
+  latent.assign(vae.reparameterize(mean, var))
+  # latent.assign(tf.random.normal([1, 64]))
+  with tf.device("/GPU:1"):
+    x_inputs = tf.boolean_mask(x_inputs, bools)
+    # for i in range(iterations):
+    loss = 100
+    while loss > 0.0008  : 
+
+      with tf.GradientTape() as tape:
 
 
-
-    
-    # Calculate neighbourhood size for each input - [batch_size, input_size, neighbours]
-    adj_size = tf.math.count_nonzero(adj, 2)
-    #deal with unconnected points: replace NaN with 0
-    non_zeros = tf.math.not_equal(adj_size, 0)
-    adj_size = tf.cast(adj_size, tf.float32)
-    adj_size = tf.where(non_zeros,tf.math.reciprocal(adj_size),tf.zeros_like(adj_size))
-    # [batch_size, input_size, 1, 1]
-    adj_size = tf.reshape(adj_size, [batch_size, input_size, 1, 1])
-    #[1, input_size, 1, 1]
-    # [batch_size, input_size, K, M]
-    if not self.is_invariant : 
-      q = self.get_weight_assigments(x, adj, u,v, c)
-    else :
-      q = self.get_weight_assigments_translation_invariance(x, adj, u, c)
-
-    # [batch_size, in_channels, input_size]
-    x = tf.transpose(x, [0, 2, 1])
-    W = tf.reshape(W, [M*out_channels, in_channels])
-    # Multiple w and x -> [batch_size, M*out_channels, input_size]
-    wx = tf.map_fn(lambda x: tf.matmul(W, x), x)
-    # Reshape and transpose wx into [batch_size, input_size, M*out_channels]
-    wx = tf.transpose(wx, [0, 2, 1])
-    # Get patches from wx - [batch_size, input_size, K(neighbours-here input_size), M*out_channels]
-    patches = self.get_patches(wx, adj)
-    # [batch_size, input_size, K, M]
-    #q = get_weight_assigments_translation_invariance(x, adj, u, c)
-    # Element wise multiplication of q and patches for each input -- [batch_size, input_size, K, M, out]
-    patches = tf.reshape(patches, [batch_size, input_size, K, M, out_channels])
-    # [out, batch_size, input_size, K, M]
-    patches = tf.transpose(patches, [4, 0, 1, 2, 3])
-    patches = tf.multiply(q, patches)
-    print(patches.shape, q.shape)
-    patches = tf.transpose(patches, [1, 2, 3, 4, 0])
-    # Add all the elements for all neighbours for a particular m sum_{j in N_i} qwx -- [batch_size, input_size, M, out]
-    patches = tf.reduce_sum(patches, axis=2)
-    patches = tf.multiply(adj_size, patches)
-    # Add add elements for all m
-    patches = tf.reduce_sum(patches, axis=2)
-    # [batch_size, input_size, out]
-    patches = patches + b
-    return patches
-
-  def get_weight_assigments(self, x, adj, u, v, c):
-
-    # [batch_size, M, N]
-    x = tf.transpose(x, [0, 2, 1])
-
-    ux = tf.map_fn(lambda x: tf.matmul(u, x), x)
-    vx = tf.map_fn(lambda x: tf.matmul(v, x), x)
-    # [batch_size, N, M]
-    vx = tf.transpose(vx, [0, 2, 1])
-    # [batch_size, N, K, M]
-    patches = self.get_patches(vx, adj)
-    
-    ux = tf.transpose(ux, [0,2,1])
-    ux = tf.expand_dims(ux, 2)
-    patches = tf.where(tf.math.not_equal(tf.expand_dims(self.adj, -1), 0), tf.add(ux, patches), tf.zeros_like(patches))
-
-    # [K, batch_size, M, N]
-    patches = tf.transpose(patches, [2, 0, 3, 1])
-    # [K, batch_size, M, N]
-    # patches = tf.add(ux, patches)
-    # [K, batch_size, N, M]
-    patches = tf.transpose(patches, [0, 1, 3, 2])
-    patches = tf.add(patches, c)
-    # [batch_size, N, K, M]
-    patches = tf.transpose(patches, [1, 2, 0, 3])
-    patches = tf.nn.softmax(patches)
-    return patches
-
-  def get_weight_assigments_translation_invariance(self, x, adj, u, c):
-    #preprocess for weight and shape
-    batch_size = tf.shape(x)[0]
-    num_points = self.vertex_size
-    in_channels = self.coord_size
-    K = tf.shape(adj)[-1]
-    M = self.kernel_size
-
-
-    # [batch, N, K, ch]
-    patches = self.get_patches(x, adj)
-    # [batch, N, ch, 1]
-    # x = tf.reshape(x, [-1, num_points, in_channels, 1])
-    x = tf.reshape(x, [-1, num_points, 1, in_channels])
-    patches = tf.where(tf.math.not_equal(tf.expand_dims(self.adj, -1), 0), tf.subtract(x, patches), tf.zeros_like(patches))
-    
-    print("shape is what is shape,", x.shape, patches.shape)
-    
-    # [batch, N, ch, K]
-    patches = tf.transpose(patches, [0, 1, 3, 2])
-
-
-    
-
-    # [batch, N, ch, K]
-    # patches = tf.subtract(x, patches)
-    # [batch, ch, N, K]
-    patches = tf.transpose(patches, [0, 2, 1, 3])
-    # [batch, ch, N*K]
-    x_patches = tf.reshape(patches, [-1, in_channels, num_points*K])
-    # batch, M, N*K
-    patches = tf.map_fn(lambda x: tf.matmul(u, x) , x_patches)
-    # batch, M, N, K
-    patches = tf.reshape(patches, [-1, M, num_points, K])
-    # [batch, K, N, M]
-    patches = tf.transpose(patches, [0, 3, 2, 1])
-    # [batch, K, N, M]
-    patches = tf.add(patches, c)
-    # batch, N, K, M
-    patches = tf.transpose(patches, [0, 2, 1, 3])
-    patches = tf.nn.softmax(patches)
-    return patches
-
-  def get_slices(self, x, adj):
-    batch_size = tf.shape(x)[0]
-
-    num_points = self.vertex_size
-    in_channels =x.shape [-1]
-
-    print("whait is in channels", in_channels)
-    K = tf.shape(adj)[-1]
-    zeros = tf.zeros([batch_size, 1, in_channels], dtype=tf.float32)
-    x = tf.concat([zeros, x], 1)
-    x = tf.reshape(x, [batch_size*(num_points+1), in_channels])
-    adj = tf.reshape(adj, [batch_size*num_points*K])
-    adj_flat = self.tile_repeat(batch_size, num_points*K)
-    adj_flat = adj_flat*(num_points+1)
-    adj_flat = adj_flat + adj
-    adj_flat = tf.reshape(adj_flat, [batch_size*num_points, K])
-    slices = tf.gather(x, adj_flat)
-    slices = tf.reshape(slices, [batch_size, num_points, K, in_channels])
-    return slices
-
-  def get_patches(self, x, adj):
-    patches = self.get_slices(x, adj)
-    return patches
-
-  def tile_repeat(self, n, repTime):
-    '''
-    create something like 111..122..2333..33 ..... n..nn 
-    one particular number appears repTime consecutively.
-    This is for flattening the indices.
-    '''
-    idx = tf.range(n)
-    idx = tf.reshape(idx, [-1, 1])    # Convert to a n x 1 matrix.
-    idx = tf.tile(idx, [1, repTime])  # Create multiple columns, each column has one number repeats repTime 
-    y = tf.reshape(idx, [-1])
-    return y
+        result = vae.decode(latent)
+        result = tf.boolean_mask(result, bools) 
+        # result = tf.where(tf.expand_dims(bools, -1),tf.ones_like(result), result)     
+        # loss = tf.reduce_mean(tf.math.reduce_sum( result-x_inputs, axis=-1), axis=-1)
+        loss = tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(result-x_inputs, 2.0), axis=-1)), axis=-1)
+        loss = tf.reduce_mean(loss)
+      
+        print("iter : "," loss : ", loss,end="\r")
+        gradient = tape.gradient(loss, latent)
+        # print(gradient,"\n", latent)
+        # optimizer.apply_gradients(zip([gradient], [latent]))
+        optimizer.apply_gradients(zip([gradient],[latent]))
+  return vae.decode(latent)
 
 

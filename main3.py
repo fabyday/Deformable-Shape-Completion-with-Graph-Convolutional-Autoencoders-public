@@ -4,6 +4,7 @@ import numpy as np
 
 import os 
 import time 
+import model.modelwrapper as Model
 import random 
 import copy 
 import json 
@@ -32,10 +33,13 @@ else :
 ############################################################################
 
 #common sets
-name="test_model_2020_3sd-reiqwen"
-name="var_relu_small_relu_plz"
-name="mode_vae_1"
 
+# name="good_AUTOENCODER_plz05" "it is correct"
+name="VAE_MODEL_01" #kl_loss is 1
+name="VAE_MODEL_09" # kl_loss is 10e-8
+name="VAE_MODEL_32"
+
+name="test_model_vae_3232059230"
 
 #loader sets
 noise_type = "plain"
@@ -89,7 +93,7 @@ if available_psbody :
     print("U", len(U))
     print("D", len(D))
     A=A[0]
-    A.data = A.data / A.data
+    A.data = A.data/A.data
     A = [A]
 
     model_params['A'] = A # basically (5023, 5023) values is all 1,0 or 2.
@@ -115,13 +119,14 @@ model_params['tensorboard_path'] = os.path.join('./summaries/',model_params['nam
 ############################################################################
 
 
-print(np.max(np.sum(A[0].toarray(), -1)), A[0].toarray().shape , "wahtis")
 
+model = Model.ModelWrapper(**model_params)
 
+del model
 import model.modelwrapper3 as mod2
 print("nei.............", neighbor[0].shape)
-model = mod2.get_vae(A[0], model_params['batch_size'])
-model = mod2.get_vae(neighbor[0], model_params['batch_size'])
+model = mod2.get_vae(neighbor[0])
+
 
 ############################################################################
 

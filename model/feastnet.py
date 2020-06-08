@@ -75,8 +75,8 @@ class FeastNet(tf.keras.layers.Layer):
         self.W = self.add_weight(name="W", shape=[self.input_channel, self.kernel_size*self.out_channel], initializer=self.initializer) 
 
 
-        self.W_bias = self.add_weight(name="u", shape=[self.out_channel], initializer=self.initializer)
-        self.u_bias = self.add_weight(name="u", shape=[self.kernel_size], initializer=self.initializer)
+        # self.W_bias = self.add_weight(name="W_bias", shape=[self.out_channel], initializer=self.initializer)
+        # self.u_bias = self.add_weight(name="u_bias", shape=[self.kernel_size], initializer=self.initializer)
 
 
 

@@ -36,7 +36,7 @@ class Loader(object):
 
     __load_dir_cache =   {
                         __plain_dirname : "plain",
-                        __small_hole_noise_dirname : "smallhole",
+                        __small_hole_noise_dirname : "hole_sparse",
                         __big_hole_noise_dirname : "bighole",
                         __sparse_noise_dirname : "sparse"
                     }

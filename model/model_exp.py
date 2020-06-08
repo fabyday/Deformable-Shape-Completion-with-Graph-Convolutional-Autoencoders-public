@@ -58,12 +58,12 @@ def loss(y_label, y_pred, args=None):
             # kl_loss= tf.keras.backend.square(z_mean) + tf.keras.backend.square(z_log_var) - tf.keras.backend.exp(z_log_var) + - 1
             # kl_loss = tf.keras.backend.sum(kl_loss, axis = - 1)
             # print("z_log_var", z_log_var)
-            # kl_loss= - 0.5 * tf.reduce_mean(
-            #                     z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1, -1)
+            kl_loss= - 0.5 * tf.reduce_sum(
+                                z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1, -1)
             # print("whait si kl loss", kl_loss)
 
 
-            # total_loss += kl_loss
+            total_loss += 10e-8 * kl_loss
 
             # tf.print("total loss + kl_loss : ", total_loss)
             # tf.print("*"*10)

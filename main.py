@@ -33,7 +33,7 @@ else :
 
 #common sets
 name="test_model_2020_3sd-reiqwen"
-name="main_im"
+name="vae_good_vae_01"
 
 
 #loader sets
@@ -55,7 +55,7 @@ model_params = dict()
 model_params['name'] = name
 model_params['random_seed'] = 30000
 model_params['batch_size'] = 2
-model_params['kernel_size'] = 6
+model_params['kernel_size'] = 8
 
 model_params['num_epoch'] = 200
 # model_params['F'] = [16, 32]#, 64, 96, 128] ### input_shape      [ hidden_layer_output_shape1 ... ]

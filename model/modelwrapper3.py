@@ -1,121 +1,149 @@
 import tensorflow as tf
 from . import model_exp as model 
-import tensorflow_graphics as tfg
+# import tensorflow_graphics as tfg
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
-import numpy as np 
-import scipy.sparse as sp
+
 # tf.debugging.set_log_device_placement(True)
-#if you want to run eagerly. use tf.config.experimental_run_functions_eagerly(True)
-# tf.config.experimental_run_functions_eagerly(True)
+import numpy as np 
+from . import feastnet as fn
+
+#                                    ___,,___
+#                                 ,d8888888888b,_
+#                             _,d889'        8888b,
+#                         _,d8888'          8888888b,
+#                     _,d8889'           888888888888b,_
+#                 _,d8889'             888888889'688888, /b
+#             _,d8889'               88888889'     `6888d 6,_
+#          ,d88886'              _d888889'           ,8d  b888b,  d\
+#        ,d889'888,             d8889'               8d   9888888Y  )
+#      ,d889'   `88,          ,d88'                 d8    `,88aa88 9
+#     d889'      `88,        ,88'                   `8b     )88a88'
+#    d88'         `88       ,88                   88 `8b,_ d888888
+#   d89            88,      88                  d888b  `88`_  8888
+#   88             88b      88                 d888888 8: (6`) 88')
+#   88             8888b,   88                d888aaa8888, `   'Y'
+#   88b          ,888888888888                 `d88aa `88888b ,d8
+#   `88b       ,88886 `88888888                 d88a  d8a88` `8/
+#    `q8b    ,88'`888  `888'"`88          d8b  d8888,` 88/ 9)_6
+#      88  ,88"   `88  88p    `88        d88888888888bd8( Z~/
+#      88b 8p      88 68'      `88      88888888' `688889`
+#      `88 8        `8 8,       `88    888 `8888,   `qp'
+#        8 8,        `q 8b       `88  88"    `888b
+#        q8 8b        "888        `8888'
+#         "888                     `q88b
+#                                   "888'
+
+# NOTIFICATION
+# IT IS PREDICT CORRECT WHEN EPOC WAS 22 AT LEAST. LOSS MUST BE LESS THAN 10E-7.
+#
+#
+#
+#
+#
+
+
+
+
 session = tf.compat.v1.Session(config=config)
-class CVAE(tf.keras.Model):
-  def __init__(self, adj, batch_size):
-    super(CVAE, self).__init__()
-    self.latent_dim = 32
-    # self.adj = adj
-    self.kernel = 7
-    
-    self.adj  = sp.csr_matrix(adj)
-    coo = self.adj.tocoo()
-    # print(coo)
-    indices = np.mat([coo.row, coo.col]).transpose()
-    sparse_A_tensor = tf.sparse.SparseTensor(indices, coo.data, coo.shape)
-    sparse_A_tensor = tf.sparse.expand_dims(sparse_A_tensor, axis=0)
-    
-    # print(sparse_A_tensor.shape)
-    self.adj = ( tf.sparse.concat( 0, [sparse_A_tensor for _ in range(batch_size)] ) )
+
+def reparameterize( mean_logvar):
+  mean, logvar = mean_logvar
+  eps = tf.random.normal(shape=tf.shape(mean))
+  return eps * tf.exp(logvar * .5) + mean
+
+
+
+def get_vae(adj):
   
-    e_inputs = tf.keras.layers.Input((5023,3), batch_size)
-    e1 = tf.keras.layers.Dense(16, name="linear_input")(e_inputs)
-    e2 = tf.keras.layers.BatchNormalization()(e1)
-    e3 = tf.keras.layers.ReLU()(e2)
+  
+  latent_dim = 64
+  adj = adj
+  kernel = 8
+  initializer = tf.keras.initializers.GlorotNormal
+  # self.adj = tf.constant(self.adj, dtype=tf.int32)
 
-    e4 = tfg.nn.layer.graph_convolution.FeatureSteeredConvolutionKerasLayer(True, 8, 32)(e3, self.adj)
-    e5 = tf.keras.layers.BatchNormalization()(e4)
-    e6 = tf.keras.layers.ReLU()(e5)
-    
-    e7 = tf.keras.layers.Lambda(lambda x : tf.math.reduce_mean(x, 1))(e6)
-    # # # No activation
-    e8 = tf.keras.layers.Dense(self.latent_dim+ self.latent_dim)(e7)
-    self.inference_net = tf.keras.models.Model(inputs=e_inputs, outputs=e8)
+  # self.adj = np.expand_dims(self.adj, 0)
+  # self.adj = np.concatenate([self.adj for _ in range(batch_size)], axis=0)
+  with tf.device("/GPU:0"):
 
+    encoder_input = tf.keras.Input(shape=(5023,3))
+    x = tf.keras.layers.Dense(16, name="encoder_input", use_bias=False, kernel_initializer=initializer() )(encoder_input)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU()(x)
 
-    d_inputs = tf.keras.layers.Input((self.latent_dim,), batch_size)
-    d2 = tf.keras.layers.Dense(units=5023* self.latent_dim )(d_inputs)
-    # model.Uppool("up_pool"),
-    d3 = tf.keras.layers.Reshape(target_shape=(5023, self.latent_dim))(d2)
-    # tf.keras.layers.Reshape(target_shape=(1, self.latent_dim)),# self.latent_dim)),
-    d4 = tf.keras.layers.BatchNormalization()(d3)
-    d5 = tf.keras.layers.ReLU()(d4)
-            
-    # model.NLayer(None, 96, name="dGconv1", adj = self.adj, kernel_size=self.kernel),
+    x = fn.FeastNet( 32, adj = adj, kernel_size=kernel, is_invariant=False, initializer=initializer(), name="dGconv1")(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU()(x)
+
+    x = fn.FeastNet( 64, adj = adj, kernel_size=kernel, is_invariant=False, initializer=initializer(), name="dGconv2")(x)
     # tf.keras.layers.BatchNormalization(),
-    # tf.keras.layers.ReLU(),
+    x = tf.keras.layers.ReLU()(x)
+
+    x = tf.keras.layers.Lambda(lambda x : tf.math.reduce_mean(x, 1), name="pooling")(x)
+
+    # # # # No activation
+    z_mean = tf.keras.layers.Dense(latent_dim ,name="z_mean", use_bias=False, kernel_initializer=initializer())(x)
+    z_log_var = tf.keras.layers.Dense(latent_dim ,name="z_log_var", use_bias=False, kernel_initializer=initializer())(x)
     
-    # model.NLayer(None, 64, name="dGconv2", adj = self.adj, kernel_size=self.kernel),
-    # tf.keras.layers.BatchNormalization(),
-    # tf.keras.layers.ReLU(),
-
-    d6 = tfg.nn.layer.graph_convolution.FeatureSteeredConvolutionKerasLayer(True, 8, 32)(d5, self.adj)
-    d7 = tf.keras.layers.BatchNormalization()(d6)
-    d8 = tf.keras.layers.ReLU()(d7)
-
-    d9 = tfg.nn.layer.graph_convolution.FeatureSteeredConvolutionKerasLayer(True, 8, 16)(d8, self.adj)
-    d10 = tf.keras.layers.ReLU()(d9)
-
-    d11 = tf.keras.layers.Dense(3, name="linear_output")(d10)
-    self.generative_net = tf.keras.models.Model(inputs=d_inputs, outputs=d11)
+    z = tf.keras.layers.Lambda(reparameterize, output_shape=(latent_dim,), name='z')([z_mean, z_log_var])
 
 
+    inference_net = tf.keras.Model(encoder_input, [z_mean, z_log_var, z])
+    inference_net.summary()
+
+      
+      
 
 
+    input_decoder = tf.keras.Input(shape=(latent_dim,))
+    x = tf.keras.layers.Dense(units=5023* latent_dim ,name="decoder_input", use_bias=False, kernel_initializer=initializer())(input_decoder)
+    x = tf.keras.layers.Reshape(target_shape=(5023, latent_dim))(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU()(x)
+    
+    x = fn.FeastNet( 64,adj = adj, kernel_size=kernel,  is_invariant=False,  initializer=initializer(), name="dGconv6")(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU()(x)
 
-  @tf.function
-  def sample(self, eps=None):
-    if eps is None:
-      eps = tf.random.normal(shape=(100, self.latent_dim))
-    return self.decode(eps, apply_sigmoid=True)
+    x = fn.FeastNet( 32, adj = adj, kernel_size=kernel, is_invariant=False,  initializer=initializer(), name="dGconv7")(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.ReLU()(x)
 
-  def encode(self, x):
-    mean, logvar = tf.split(self.inference_net(x), num_or_size_splits=2, axis=1)
-    return mean, logvar
-    # return self.inference_net(x)
+    x = fn.FeastNet(16, adj = adj, kernel_size=kernel,  is_invariant=False,  initializer=initializer(), name="dGconv8")(x)
+    x = tf.keras.layers.ReLU()(x)
 
-  def reparameterize(self, mean, logvar):
-    eps = tf.random.normal(shape=tf.shape(mean))
-    return eps * tf.exp(logvar * .5) + mean
-
-  def decode(self, z, apply_sigmoid=False):
-    logits = self.generative_net(z)
-
-
-    return logits
-  
-  def call(self, inputs):
-    with tf.device("/GPU:0"):
-
-      mean, var = self.encode(inputs)
-      z = self.reparameterize(mean, var)
-
-      # z = self.encode(inputs)
-    # print(z.shape, "what is z shape")
-    kl_loss = - 0.5 * tf.reduce_mean(
-                                var - tf.square(mean) - tf.exp(var) + 1, -1)
-    kl_loss = kl_loss
-    self.add_loss(kl_loss)
-    with tf.device("/GPU:1"):
-
-      return self.decode(z)
+    x = tf.keras.layers.Dense(3, name="decoder_output", use_bias=False, kernel_initializer=initializer())(x)
+      
+    generative_net =  tf.keras.Model(input_decoder, x)
+    generative_net.summary()
 
 
+    output = generative_net(inference_net(encoder_input)[2])
+    vae = tf.keras.Model(encoder_input, output)
+    print(output.shape)
+      
+    # tf.print("whait is vae losses", self.losses)
+    total_loss = tf.keras.losses.MSE(encoder_input, output)
+    # total_loss = tf.reduce_mean(tf.math.sqrt(tf.math.reduce_sum( tf.math.pow(encoder_input-output, 2.0), axis=-1)), axis=-1)
+    kl_loss = - 0.5* 10e-8 * tf.reduce_sum(
+                                z_log_var - tf.square(z_mean) - tf.exp(z_log_var) + 1, -1)
+    kl_loss = tf.reshape(kl_loss, [-1, 1])
+    vae_loss = tf.keras.backend.mean(kl_loss + total_loss)
+    print(vae_loss.shape)
+    vae.add_loss(vae_loss)
 
+    
+                              
+    print(total_loss, "total loss is whats")
+   
 
-def get_vae(adj,batch_size):
-  vae = CVAE(adj,batch_size)
-  optimizer = tf.keras.optimizers.Adam(1e-4)
-  
-  vae.compile(optimizer, loss =tf.keras.losses.MeanSquaredError(),metrics=['accuracy'])
+    
+    # optimizer = tf.keras.optimizers.Adam(1e-4)
+  with tf.device("/GPU:1"):
+
+    vae.compile(optimizer="adam",metrics=['accuracy'])
+    vae.summary()
   return vae
 
 import os
@@ -142,11 +170,12 @@ def fit(vae, x, epochs, name):
     print("load weight...")
     vae.load_weights(latest)
 
-
+  print(vae.losses, "what is vae losses")
   tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
-
   cp_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=0, save_weights_only=True,save_freq=5)
-  vae.fit(x, x, epochs=epochs, batch_size = 2, callbacks=[cp_callback, tensorboard_callback])
+
+  with tf.device("/GPU:1"):
+    vae.fit(x, epochs=epochs, batch_size = 2, callbacks=[cp_callback, tensorboard_callback])
 
 
 def pred(vae, x, name) : 
@@ -163,3 +192,6 @@ def summary(vae):
   vae.inference_net.summary()
   vae.generative_net.summary()
   vae.summary()
+
+
+

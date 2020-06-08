@@ -19,7 +19,7 @@ from GraphicCodeColection.loader import Loader
 argv = os.sys.argv
 
 
-if argv[1] in ["test", "train", 'summary']:
+if argv[1] in ["test", "train", 'summary', 'phase2']:
     mode = argv[1]
 else : 
     mode = "train"
@@ -35,14 +35,19 @@ else :
 #common sets
 
 # name="good_AUTOENCODER_plz05" "it is correct"
-name="VAE_MODEL_01" #kl_loss is 1
-name="VAE_MODEL_09" # kl_loss is 10e-8
-name="VAE_MODEL_32"
 
-name="good_Var_AUTOENCODER_plz142123"
+name="good_Var_AUTOENCODER_plz142121231231asdaa123132132sdasddsdkgjldsfjgad3413123"
 
 #loader sets
-noise_type = "plain"
+if mode in  ["test", "train", 'summary'] : 
+    noise_type = "plain"
+elif mode in ['phase2']:
+    noise_type = 'small_hole_noise'
+
+
+
+# noise_type = "plain"
+
 data_path = "./processed_dataset/plain/bareteeth"
 test_size = 10
 loader = Loader(common_load_dir_name=data_path, 
@@ -185,4 +190,20 @@ elif mode == "summary":
     inputs = loader.get_data_normalize(inputs)
     # labels = loader.get_data_normalize(labels)
     pred, loss = model.predict(inputs=inputs,labels=labels,  batch_size=1)
+    model.see_all_values()
+elif mode == "phase2":
+    datadict = loader.get_train_data()
+    # labels = datadict['labels'][:test_size] 
+    inputs = datadict['input'][:test_size]
+    labels = datadict['labels'][0] 
+    # labels = loader.get_reference().v
+    # labels = datadict['labels'][:1] 
+
+    pred = mod2.phase2_test(vae=model, x_inputs = inputs, x_label=labels, name=name, batch_size=1)
+    name = name + "_phase2"
+    print("pred", pred.shape)
+    loader.save_ply(pred, name="pred", path="./conv_ply/"+name)
+    loader.save_ply(inputs, name = "test",path="./conv_ply/"+name)    
+    loader.save_ply(labels, name = "orig",path="./conv_ply/"+name)    
+    
     model.see_all_values()
